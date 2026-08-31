@@ -1,0 +1,560 @@
+Task 2 Development Handoff
+Date: 2026-08-31
+Project: 2026 Summer Integrated Robot Program - Group Project
+Repository: chixin114514/2026Summer_IntegratedRobotProgram_Group-Team_fullcans
+Task directory: tak2/
+
+============================================================
+1. TASK GOAL
+============================================================
+
+Task 2 is the fixed-point robotic-arm pick-and-place experiment.
+
+The required overall sequence is:
+
+1) Home
+2) Move above pickup point A
+3) Descend
+4) Grasp the object
+5) Lift to a safe height
+6) Move above placement point B
+7) Descend
+8) Release
+9) Return home
+
+The task is first implemented in simulation and later transferred to the real mechArm 270 while keeping the same ROS 2 task logic as much as possible.
+
+The simulation must ultimately contain:
+
+- mechArm 270
+- gripper
+- table
+- fixed target object
+- fixed pickup point A
+- fixed placement point B
+- safe travel height
+- ROS 2 control interface
+- exception handling
+- one Launch file for the complete simulation
+- execution result / trajectory / error logging
+
+User workflow requirement:
+- Write code primarily on the Mac.
+- Commit every completed code stage.
+- Commit messages must be in English.
+- Push to the group GitHub repository.
+- Jetson is mainly used to git pull, build and run ROS 2 / Gazebo.
+- Do not perform unnecessary extra tests or repeated QC checks. Directly advance the task unless an actual error appears.
+
+============================================================
+2. MACHINES AND PATHS
+============================================================
+
+Mac project parent directory:
+
+/Users/moln/Desktop/2026Summer_junxiLI
+
+Mac group repository:
+
+/Users/moln/Desktop/2026Summer_junxiLI/2026Summer_IntegratedRobotProgram_Group-Team_fullcans
+
+Jetson SSH:
+
+ssh nvidia@192.168.55.1
+
+Jetson repository:
+
+~/Desktop/2026Summer_IntegratedRobotProgram_Group-Team_fullcans
+
+Jetson Task 2 ROS 2 workspace:
+
+~/Desktop/2026Summer_IntegratedRobotProgram_Group-Team_fullcans/tak2/ros2_ws
+
+============================================================
+3. JETSON ENVIRONMENT
+============================================================
+
+Confirmed Jetson environment:
+
+- Ubuntu 22.04.5 LTS
+- Architecture: arm64 / aarch64
+- ROS 2 Humble
+- colcon installed
+
+Important: Gazebo Classic could not be installed from the Ubuntu repository on this ARM64 Jetson.
+
+The final simulation stack was therefore changed to:
+
+ROS 2 Humble
++
+Ignition Gazebo Fortress / Gazebo 6
++
+ros_ign_bridge
+
+Installed / confirmed:
+
+- ignition-fortress
+- Ignition Gazebo version 6.18.0
+- ros-humble-ros-ign-bridge
+- ros-humble-robot-state-publisher
+
+Gazebo version command:
+
+ign gazebo --versions
+
+Confirmed output:
+
+6.18.0
+
+ROS 2 <-> Gazebo clock bridge was successfully demonstrated earlier. /clock data was received continuously in ROS 2.
+
+Do NOT try to install:
+
+ros-humble-gazebo-ros-pkgs
+
+or
+
+ros-humble-ros-ign-gazebo
+
+The first is for the Gazebo Classic route that was abandoned, and the second was not available as required on this Jetson ARM64 setup.
+
+============================================================
+4. GAZEBO INSTALLATION PROBLEM THAT WAS ALREADY SOLVED
+============================================================
+
+During installation, Ubuntu-provided Ignition packages and OSRF-provided Fortress packages were mixed, causing dpkg overwrite conflicts such as:
+
+libignition-plugin
+vs
+libignition-plugin1-1
+
+and
+
+sdformat12-sdf
+vs
+sdformat-sdf
+
+The mixed Gazebo / Ignition / SDFormat packages were removed and the simulator was reinstalled as a single OSRF Fortress stack.
+
+After that, Ignition Gazebo 6.18.0 worked normally.
+
+Do not repeat the old mixed-package installation process.
+
+============================================================
+5. REPOSITORY ORGANISATION
+============================================================
+
+The group repository root README describes the summer-term integrated robotics group project.
+
+tak2/README.md describes Task 2.
+
+Task 2 workspace currently contains:
+
+tak2/
+  README.md
+  THIRD_PARTY.md
+  TASK2_HANDOFF_20260831.txt
+  ros2_ws/
+    src/
+      task2_sim/
+      mycobot_description/
+
+The imported mycobot_description package comes from the official Elephant Robotics mycobot_ros2 repository, Humble branch.
+
+It includes official mechArm 270 robot-description resources.
+
+THIRD_PARTY.md records this source.
+
+============================================================
+6. task2_sim PACKAGE STATUS
+============================================================
+
+The custom ROS 2 package is:
+
+task2_sim
+
+Current major directories:
+
+task2_sim/
+  config/
+  launch/
+  resource/
+  task2_sim/
+  urdf/
+  worlds/
+  package.xml
+  setup.py
+  setup.cfg
+
+------------------------------------------------------------
+6.1 Task point configuration
+------------------------------------------------------------
+
+File:
+
+tak2/ros2_ws/src/task2_sim/config/task_points.yaml
+
+Current initial simulation parameters include approximately:
+
+Pickup A:
+  x = 0.18 m
+  y = +0.10 m
+  z = 0.05 m
+
+Placement B:
+  x = 0.18 m
+  y = -0.10 m
+  z = 0.05 m
+
+Safe height:
+  0.15 m
+
+Initial velocity scale:
+  0.20
+
+Initial acceleration scale:
+  0.20
+
+Repeat count:
+  5
+
+These coordinates are configuration values and may need later adjustment when the robot base / table coordinate convention is finalised.
+
+------------------------------------------------------------
+6.2 Task world
+------------------------------------------------------------
+
+File:
+
+tak2/ros2_ws/src/task2_sim/worlds/task2_world.sdf
+
+The world currently includes:
+
+- ground plane
+- table
+- fixed pickup target object
+- placement marker at B
+- light
+- Gazebo physics / scene systems
+
+The target object mass was set to 0.05 kg (50 g), below the experiment's 100 g limit.
+
+The table top is at approximately z = 0.40 m.
+
+The robot base is therefore spawned at approximately z = 0.40 m.
+
+------------------------------------------------------------
+6.3 Official mechArm description
+------------------------------------------------------------
+
+The official Elephant Robotics package was imported into:
+
+tak2/ros2_ws/src/mycobot_description
+
+The original official mechArm 270 M5 URDF contains the six-link / six-joint kinematic chain, meshes and joint limits.
+
+However, the official URDF does not provide the complete inertial data required for Gazebo physics.
+
+============================================================
+7. IMPORTANT CURRENT MODEL FIX
+============================================================
+
+A previous Launch successfully reached the following stages:
+
+- task2_sim package launched
+- robot_state_publisher started
+- robot links base through link6 were read
+- ros_ign_bridge created the Gazebo -> ROS /clock bridge
+- Gazebo world started
+
+Then spawning the original official URDF failed with errors similar to:
+
+link[base] has no <inertial> block defined
+
+and later:
+
+A model must have at least one link
+
+Root cause:
+
+The official mechArm_270_m5 URDF is suitable as a robot description / kinematic model, but Gazebo physics requires inertial properties on links.
+
+A new Gazebo-ready model was therefore created on the Mac and committed:
+
+tak2/ros2_ws/src/task2_sim/urdf/mecharm_270_gazebo.urdf
+
+This model keeps the official Elephant Robotics mesh resources and joint structure / limits, while adding:
+
+- inertial blocks
+- approximate masses
+- approximate inertia tensors
+- simplified collision geometry
+- joint damping
+- joint friction
+- non-zero velocity limits
+
+The corresponding task2_sim/setup.py was updated so the urdf/*.urdf files are installed.
+
+The Launch file was also updated to use:
+
+mecharm_270_gazebo.urdf
+
+instead of directly spawning the original official URDF.
+
+IMPORTANT:
+This latest Gazebo-ready model commit has been pushed from the Mac to GitHub, but as of the handoff moment the Jetson has NOT yet successfully pulled this newest commit.
+
+============================================================
+8. CURRENT LAUNCH ARCHITECTURE
+============================================================
+
+File:
+
+tak2/ros2_ws/src/task2_sim/launch/task2_sim.launch.py
+
+Current intended Launch flow:
+
+1) Set IGN_GAZEBO_RESOURCE_PATH so Gazebo can resolve package://mycobot_description/... mesh references.
+2) Start Ignition Gazebo server with task2_world.sdf.
+3) Start ros_ign_bridge for /clock.
+4) Start robot_state_publisher with mecharm_270_gazebo.urdf.
+5) After a short delay, call Ignition Gazebo EntityFactory service to spawn mechArm 270 into task2_world.
+
+The robot spawn method uses:
+
+ign service
+
+instead of ros_ign_gazebo / ros_gz_sim because the required binary route was not available on this Jetson ARM64 setup.
+
+============================================================
+9. ROS 2 WORKSPACE ENVIRONMENT ISSUE
+============================================================
+
+A recurring Jetson issue occurred where:
+
+colcon build
+
+finished successfully, but:
+
+source install/setup.bash
+
+still left ROS 2 searching only:
+
+/opt/ros/humble
+
+and ROS 2 reported:
+
+Package 'task2_sim' not found
+
+The manual environment export below successfully solved that issue:
+
+source /opt/ros/humble/setup.bash
+export AMENT_PREFIX_PATH="$PWD/install:$AMENT_PREFIX_PATH"
+export COLCON_PREFIX_PATH="$PWD/install:$COLCON_PREFIX_PATH"
+export PYTHONPATH="$PWD/install/lib/python3.10/site-packages:$PYTHONPATH"
+
+After these exports, ros2 launch successfully found task2_sim.
+
+Until the setup-script behaviour is cleaned up, continue using this manual environment method on the Jetson.
+
+============================================================
+10. BUILD WARNING THAT CAN BE IGNORED
+============================================================
+
+During colcon build, the imported official mycobot_description package prints a setuptools warning similar to:
+
+Unknown distribution option: 'tests_require'
+
+The package still finishes building successfully.
+
+Do not spend time fixing this warning unless it actually blocks a later task.
+
+============================================================
+11. VERY IMPORTANT: MAC VS JETSON WORKFLOW
+============================================================
+
+Do not accidentally paste Mac code-writing commands into the Jetson SSH terminal.
+
+Mac prompt / workflow:
+
+cd /Users/moln/Desktop/2026Summer_junxiLI/2026Summer_IntegratedRobotProgram_Group-Team_fullcans
+
+Write / edit code here.
+Commit here.
+Push here.
+
+Jetson prompt / workflow:
+
+ssh nvidia@192.168.55.1
+
+cd ~/Desktop/2026Summer_IntegratedRobotProgram_Group-Team_fullcans
+
+git pull
+
+Then build and run.
+
+One mistaken paste previously attempted to create:
+
+tak2/ros2_ws/...
+
+while already inside Jetson's tak2/ros2_ws directory. A mistakenly-created nested ./tak2 path was removed afterwards.
+
+============================================================
+12. CURRENT EXACT HANDOFF POINT
+============================================================
+
+The user is currently on the Jetson.
+
+The newest Mac commit containing the Gazebo-ready mechArm model has already been pushed to GitHub.
+
+The Jetson has NOT yet completed the new pull/build/launch cycle for this latest commit.
+
+Immediately before handoff, the user attempted:
+
+git pull origin main
+
+and the command appeared to hang. Arrow keys produced terminal escape characters (^[[A / ^[[B).
+
+The user has NOT yet executed the proposed retry command:
+
+cd ~/Desktop/2026Summer_IntegratedRobotProgram_Group-Team_fullcans
+
+timeout 30 git pull --ff-only origin main
+
+Therefore the NEXT PERSON SHOULD START FROM THIS EXACT POINT.
+
+============================================================
+13. NEXT STEP - DO THIS FIRST
+============================================================
+
+On the currently stuck Jetson terminal:
+
+1) Press Ctrl+C.
+
+2) Run:
+
+cd ~/Desktop/2026Summer_IntegratedRobotProgram_Group-Team_fullcans
+
+timeout 30 git pull --ff-only origin main
+
+If that succeeds, continue directly. Do not perform extra Git checks unless it actually errors.
+
+3) Build:
+
+cd ~/Desktop/2026Summer_IntegratedRobotProgram_Group-Team_fullcans/tak2/ros2_ws
+
+source /opt/ros/humble/setup.bash
+
+colcon build --symlink-install --merge-install
+
+4) Set the workspace environment manually:
+
+source /opt/ros/humble/setup.bash
+
+export AMENT_PREFIX_PATH="$PWD/install:$AMENT_PREFIX_PATH"
+export COLCON_PREFIX_PATH="$PWD/install:$COLCON_PREFIX_PATH"
+export PYTHONPATH="$PWD/install/lib/python3.10/site-packages:$PYTHONPATH"
+
+5) Launch:
+
+ros2 launch task2_sim task2_sim.launch.py
+
+Do not perform extra topic / TF / package tests unless launch produces a real error.
+
+If launch now continues without the old inertial error, move directly to the next development stage.
+
+============================================================
+14. NEXT DEVELOPMENT STAGES AFTER THE MODEL SPAWNS
+============================================================
+
+The planned remaining implementation order is:
+
+Stage A - Joint control
+- add control capability for the six mechArm joints
+- choose / integrate an ARM64-compatible Gazebo joint-control mechanism
+- implement Home posture
+- keep joint-limit safety
+- commit after this code stage
+
+Stage B - Gripper
+- add a simple simulated gripper model / joints
+- implement open / close commands
+- later keep the same high-level grasp API for the real robot
+- commit after this code stage
+
+Stage C - Task motion sequence
+- implement the fixed-point sequence:
+  Home -> A above -> A -> grasp -> safe height -> B above -> B -> release -> Home
+- read A, B and safe-height parameters from YAML rather than hard-coding them in task logic
+- commit after this code stage
+
+Stage D - Motion planning / IK and safety
+- MoveIt 2 or another suitable ROS 2 planning method can be integrated if compatible on this Jetson ARM64 stack
+- check unreachable target
+- check IK failure
+- check joint limits
+- stop safely and print clear error messages
+- commit after this code stage
+
+Stage E - Logging and acceptance
+- trajectory recording
+- success / failure result recording
+- error logs
+- 5 consecutive runs with >= 4 successes
+- collision / joint-limit safety
+- one Launch file for the full system
+- commit after each completed code stage
+
+Stage F - Real mechArm 270
+- keep the same high-level task logic
+- replace simulation hardware / communication / location parameters
+- use low speed initially
+- keep a readily available emergency stop method
+
+============================================================
+15. GIT RULES FOR CONTINUATION
+============================================================
+
+Repository:
+
+https://github.com/chixin114514/2026Summer_IntegratedRobotProgram_Group-Team_fullcans
+
+Current working branch used in practice:
+
+main
+
+The user explicitly requires English commit messages from now on.
+
+Examples:
+
+feat: add MechArm joint control
+feat: add simulated gripper control
+feat: implement fixed-point pick and place
+feat: add motion safety checks
+feat: add Task 2 execution logging
+fix: correct Gazebo robot spawning
+
+after each completed code stage:
+
+git add ...
+git commit -m "..."
+git push origin main
+
+============================================================
+16. DEVELOPMENT PREFERENCE
+============================================================
+
+Important user preference for the next conversation / developer:
+
+- Teach what each important code section does while advancing the project.
+- Give terminal commands inside code blocks so they can be copied directly.
+- Avoid unnecessary repeated checks.
+- If the user sends a terminal screenshot, identify the actual problem and give the next concrete step.
+- Do not repeatedly rebuild / reinstall / run QC unless a real error requires it.
+- Keep Mac and Jetson commands clearly separated.
+- Every completed code stage must be committed.
+- All future commit messages must be in English.
+
+============================================================
+END OF HANDOFF
+============================================================
