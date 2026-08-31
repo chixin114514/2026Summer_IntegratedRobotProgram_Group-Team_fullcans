@@ -1,0 +1,26 @@
+task2_pick_place:
+
+  ros__parameters:
+
+    # Coordinates are expressed relative to the robot base frame.
+    # Unit: metre.
+
+    pickup:
+      x: 0.18
+      y: 0.10
+      z: 0.05
+
+    place:
+      x: 0.18
+      y: -0.10
+      z: 0.05
+
+    # Height used when travelling between task points.
+    safe_height: 0.15
+
+    # Initial conservative motion settings.
+    velocity_scale: 0.20
+    acceleration_scale: 0.20
+
+    # Number of required consecutive experiment runs.
+    repeat_count: 5

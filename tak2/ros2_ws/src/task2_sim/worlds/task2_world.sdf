@@ -1,0 +1,266 @@
+<?xml version="1.0" ?>
+
+<sdf version="1.8">
+
+  <world name="task2_world">
+
+    <!-- Physics -->
+    <physics
+      name="default_physics"
+      type="ignored">
+
+      <max_step_size>
+        0.001
+      </max_step_size>
+
+      <real_time_factor>
+        1.0
+      </real_time_factor>
+
+    </physics>
+
+    <!-- Gazebo core systems -->
+    <plugin
+      filename="ignition-gazebo-physics-system"
+      name="ignition::gazebo::systems::Physics"/>
+
+    <plugin
+      filename="ignition-gazebo-user-commands-system"
+      name="ignition::gazebo::systems::UserCommands"/>
+
+    <plugin
+      filename="ignition-gazebo-scene-broadcaster-system"
+      name="ignition::gazebo::systems::SceneBroadcaster"/>
+
+    <!-- Lighting -->
+    <light
+      type="directional"
+      name="sun">
+
+      <cast_shadows>
+        true
+      </cast_shadows>
+
+      <pose>
+        0 0 10 0 0 0
+      </pose>
+
+      <diffuse>
+        0.8 0.8 0.8 1
+      </diffuse>
+
+      <specular>
+        0.2 0.2 0.2 1
+      </specular>
+
+      <direction>
+        -0.5 0.1 -0.9
+      </direction>
+
+    </light>
+
+    <!-- Ground -->
+    <model name="ground_plane">
+
+      <static>
+        true
+      </static>
+
+      <link name="ground_link">
+
+        <collision name="ground_collision">
+
+          <geometry>
+            <plane>
+              <normal>
+                0 0 1
+              </normal>
+
+              <size>
+                4 4
+              </size>
+            </plane>
+          </geometry>
+
+        </collision>
+
+        <visual name="ground_visual">
+
+          <geometry>
+            <plane>
+              <normal>
+                0 0 1
+              </normal>
+
+              <size>
+                4 4
+              </size>
+            </plane>
+          </geometry>
+
+          <material>
+            <ambient>
+              0.65 0.65 0.65 1
+            </ambient>
+
+            <diffuse>
+              0.65 0.65 0.65 1
+            </diffuse>
+          </material>
+
+        </visual>
+
+      </link>
+
+    </model>
+
+    <!-- Experiment table -->
+    <model name="table">
+
+      <static>
+        true
+      </static>
+
+      <pose>
+        0.15 0 0.375 0 0 0
+      </pose>
+
+      <link name="table_link">
+
+        <collision name="table_collision">
+
+          <geometry>
+            <box>
+              <size>
+                0.70 0.60 0.05
+              </size>
+            </box>
+          </geometry>
+
+        </collision>
+
+        <visual name="table_visual">
+
+          <geometry>
+            <box>
+              <size>
+                0.70 0.60 0.05
+              </size>
+            </box>
+          </geometry>
+
+          <material>
+            <ambient>
+              0.45 0.30 0.20 1
+            </ambient>
+
+            <diffuse>
+              0.55 0.38 0.25 1
+            </diffuse>
+          </material>
+
+        </visual>
+
+      </link>
+
+    </model>
+
+    <!-- Pickup target object at point A -->
+    <model name="target_object">
+
+      <pose>
+        0.18 0.10 0.425 0 0 0
+      </pose>
+
+      <link name="object_link">
+
+        <inertial>
+          <mass>
+            0.05
+          </mass>
+        </inertial>
+
+        <collision name="object_collision">
+
+          <geometry>
+            <box>
+              <size>
+                0.05 0.05 0.05
+              </size>
+            </box>
+          </geometry>
+
+        </collision>
+
+        <visual name="object_visual">
+
+          <geometry>
+            <box>
+              <size>
+                0.05 0.05 0.05
+              </size>
+            </box>
+          </geometry>
+
+          <material>
+            <ambient>
+              0.85 0.15 0.10 1
+            </ambient>
+
+            <diffuse>
+              0.90 0.20 0.15 1
+            </diffuse>
+          </material>
+
+        </visual>
+
+      </link>
+
+    </model>
+
+    <!-- Placement marker at point B -->
+    <model name="place_marker">
+
+      <static>
+        true
+      </static>
+
+      <pose>
+        0.18 -0.10 0.402 0 0 0
+      </pose>
+
+      <link name="marker_link">
+
+        <visual name="marker_visual">
+
+          <geometry>
+            <cylinder>
+              <radius>
+                0.045
+              </radius>
+
+              <length>
+                0.004
+              </length>
+            </cylinder>
+          </geometry>
+
+          <material>
+            <ambient>
+              0.10 0.70 0.20 1
+            </ambient>
+
+            <diffuse>
+              0.10 0.80 0.20 1
+            </diffuse>
+          </material>
+
+        </visual>
+
+      </link>
+
+    </model>
+
+  </world>
+
+</sdf>
