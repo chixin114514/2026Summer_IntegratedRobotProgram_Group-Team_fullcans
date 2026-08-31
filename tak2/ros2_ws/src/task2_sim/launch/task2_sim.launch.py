@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from ament_index_python.packages import (
@@ -8,6 +9,7 @@ from launch import LaunchDescription
 
 from launch.actions import (
     ExecuteProcess,
+    SetEnvironmentVariable,
     TimerAction,
 )
 
@@ -33,7 +35,7 @@ def generate_launch_description():
     )
 
     # ---------------------------------------------------------
-    # Gazebo world
+    # Task 2 world
     # ---------------------------------------------------------
 
     world_file = (
@@ -43,7 +45,7 @@ def generate_launch_description():
     )
 
     # ---------------------------------------------------------
-    # Official MechArm 270 model
+    # Official Elephant Robotics MechArm 270 model
     # ---------------------------------------------------------
 
     robot_urdf = (
@@ -58,7 +60,35 @@ def generate_launch_description():
     )
 
     # ---------------------------------------------------------
-    # Start Ignition Gazebo
+    # Let Gazebo resolve package://mycobot_description/...
+    # mesh paths.
+    # ---------------------------------------------------------
+
+    resource_path = str(
+        description_share.parent
+    )
+
+    existing_resource_path = os.environ.get(
+        'IGN_GAZEBO_RESOURCE_PATH',
+        '',
+    )
+
+    if existing_resource_path:
+        resource_path = (
+            resource_path
+            + ':'
+            + existing_resource_path
+        )
+
+    set_gazebo_resource_path = (
+        SetEnvironmentVariable(
+            name='IGN_GAZEBO_RESOURCE_PATH',
+            value=resource_path,
+        )
+    )
+
+    # ---------------------------------------------------------
+    # Start Gazebo server
     # ---------------------------------------------------------
 
     gazebo_server = ExecuteProcess(
@@ -73,7 +103,7 @@ def generate_launch_description():
     )
 
     # ---------------------------------------------------------
-    # Bridge Gazebo simulation time into ROS 2
+    # Bridge Gazebo simulation time to ROS 2
     # ---------------------------------------------------------
 
     clock_bridge = Node(
@@ -90,7 +120,7 @@ def generate_launch_description():
     )
 
     # ---------------------------------------------------------
-    # Publish robot description and robot TF tree
+    # Publish the URDF and TF tree
     # ---------------------------------------------------------
 
     robot_state_publisher = Node(
@@ -113,42 +143,53 @@ def generate_launch_description():
     )
 
     # ---------------------------------------------------------
-    # Spawn MechArm 270 into Gazebo
+    # Spawn the official MechArm 270 URDF directly through
+    # Gazebo's EntityFactory service.
     #
-    # Table top:
-    #   z = 0.40 m
-    #
-    # Therefore the robot base is mounted at z = 0.40 m.
+    # This avoids ros_gz_sim / ros_ign_gazebo, whose Humble
+    # binary is not available for this Jetson ARM64 target.
     # ---------------------------------------------------------
 
-    spawn_robot = Node(
-        package='ros_ign_gazebo',
-        executable='create',
+    spawn_request = (
+        'sdf_filename: "'
+        + str(robot_urdf)
+        + '", '
+        + 'name: "mecharm_270", '
+        + 'pose: {'
+        + 'position: {'
+        + 'x: 0.0, '
+        + 'y: 0.0, '
+        + 'z: 0.40'
+        + '}'
+        + '}'
+    )
 
-        arguments=[
-            '-name',
-            'mecharm_270',
+    spawn_robot = ExecuteProcess(
+        cmd=[
+            'ign',
+            'service',
 
-            '-topic',
-            '/robot_description',
+            '-s',
+            '/world/task2_world/create',
 
-            '-x',
-            '0.0',
+            '--reqtype',
+            'ignition.msgs.EntityFactory',
 
-            '-y',
-            '0.0',
+            '--reptype',
+            'ignition.msgs.Boolean',
 
-            '-z',
-            '0.40',
+            '--timeout',
+            '5000',
 
-            '-Y',
-            '0.0',
+            '--req',
+            spawn_request,
         ],
 
         output='screen',
     )
 
-    # Give Gazebo time to create the world before spawning robot.
+    # Gazebo needs a short time to load the world before the
+    # entity creation service is called.
     delayed_robot_spawn = TimerAction(
         period=3.0,
 
@@ -158,10 +199,11 @@ def generate_launch_description():
     )
 
     # ---------------------------------------------------------
-    # One launch file starts the current simulation stack
+    # Current complete Task 2 simulation launch
     # ---------------------------------------------------------
 
     return LaunchDescription([
+        set_gazebo_resource_path,
         gazebo_server,
         clock_bridge,
         robot_state_publisher,

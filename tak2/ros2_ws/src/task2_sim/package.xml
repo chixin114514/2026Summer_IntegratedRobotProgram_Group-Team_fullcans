@@ -4,7 +4,7 @@
 
   <name>task2_sim</name>
 
-  <version>0.2.0</version>
+  <version>0.2.1</version>
 
   <description>
     ROS 2 simulation package for the Task 2 fixed-point
@@ -20,16 +20,12 @@
   <buildtool_depend>ament_python</buildtool_depend>
 
   <exec_depend>rclpy</exec_depend>
-
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>ament_index_python</exec_depend>
 
   <exec_depend>robot_state_publisher</exec_depend>
-
   <exec_depend>ros_ign_bridge</exec_depend>
-  <exec_depend>ros_ign_gazebo</exec_depend>
-
   <exec_depend>mycobot_description</exec_depend>
 
   <export>
