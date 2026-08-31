@@ -1,0 +1,243 @@
+<?xml version="1.0"?>
+
+<robot name="mecharm_270_gazebo">
+
+  <!--
+    Gazebo-ready MechArm 270 model.
+
+    Kinematic structure, mesh resources and joint limits are based on
+    the official Elephant Robotics MechArm 270 M5 description.
+
+    Simulation-specific inertial and simplified collision properties
+    are added for Gazebo physics.
+  -->
+
+  <link name="base">
+    <inertial>
+      <origin xyz="0 0 0.04" rpy="0 0 0"/>
+      <mass value="0.80"/>
+      <inertia
+        ixx="0.0020" ixy="0.0" ixz="0.0"
+        iyy="0.0020" iyz="0.0"
+        izz="0.0020"/>
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 -3.1415926"/>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/mecharm_270_m5/base.dae"/>
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0.04" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.065" length="0.08"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="link1">
+    <inertial>
+      <origin xyz="0 0 0.04" rpy="0 0 0"/>
+      <mass value="0.35"/>
+      <inertia
+        ixx="0.0010" ixy="0.0" ixz="0.0"
+        iyy="0.0010" iyz="0.0"
+        izz="0.0006"/>
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 -0.132" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/mecharm_270_m5/link1.dae"/>
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0.03" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.045" length="0.09"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="link2">
+    <inertial>
+      <origin xyz="0 -0.05 0" rpy="0 0 0"/>
+      <mass value="0.30"/>
+      <inertia
+        ixx="0.0012" ixy="0.0" ixz="0.0"
+        iyy="0.0006" iyz="0.0"
+        izz="0.0012"/>
+    </inertial>
+
+    <visual>
+      <origin xyz="-0.005 0.21 0.002" rpy="1.5708 -3.1415926 0"/>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/mecharm_270_m5/link2.dae"/>
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0 -0.05 0" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder radius="0.035" length="0.10"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="link3">
+    <inertial>
+      <origin xyz="0.05 0 0" rpy="0 0 0"/>
+      <mass value="0.25"/>
+      <inertia
+        ixx="0.0005" ixy="0.0" ixz="0.0"
+        iyy="0.0010" iyz="0.0"
+        izz="0.0010"/>
+    </inertial>
+
+    <visual>
+      <origin xyz="-0.09 0.306 0.005" rpy="1.5708 3.1415926 0"/>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/mecharm_270_m5/link3.dae"/>
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0.05 0 0" rpy="0 1.5708 0"/>
+      <geometry>
+        <cylinder radius="0.032" length="0.11"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="link4">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.20"/>
+      <inertia
+        ixx="0.0005" ixy="0.0" ixz="0.0"
+        iyy="0.0005" iyz="0.0"
+        izz="0.0004"/>
+    </inertial>
+
+    <visual>
+      <origin xyz="0.009 -0.311 -0.228" rpy="0 1.5708 1.5708"/>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/mecharm_270_m5/link4.dae"/>
+      </geometry>
+    </visual>
+
+    <collision>
+      <geometry>
+        <sphere radius="0.04"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="link5">
+    <inertial>
+      <origin xyz="0.03 0 0" rpy="0 0 0"/>
+      <mass value="0.16"/>
+      <inertia
+        ixx="0.0003" ixy="0.0" ixz="0.0"
+        iyy="0.0004" iyz="0.0"
+        izz="0.0004"/>
+    </inertial>
+
+    <visual>
+      <origin xyz="-0.292 -0.318 -0.007" rpy="1.5708 0 3.1415926"/>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/mecharm_270_m5/link5.dae"/>
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0.03 0 0" rpy="0 1.5708 0"/>
+      <geometry>
+        <cylinder radius="0.03" length="0.065"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <link name="link6">
+    <inertial>
+      <origin xyz="0.025 0 0" rpy="0 0 0"/>
+      <mass value="0.12"/>
+      <inertia
+        ixx="0.0002" ixy="0.0" ixz="0.0"
+        iyy="0.00025" iyz="0.0"
+        izz="0.00025"/>
+    </inertial>
+
+    <visual>
+      <origin xyz="-0.1645 0.0536 -0.211" rpy="0 1.5708 0"/>
+      <geometry>
+        <mesh filename="package://mycobot_description/urdf/mecharm_270_m5/link6.dae"/>
+      </geometry>
+    </visual>
+
+    <collision>
+      <origin xyz="0.025 0 0" rpy="0 1.5708 0"/>
+      <geometry>
+        <cylinder radius="0.027" length="0.05"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="joint1_to_base" type="revolute">
+    <parent link="base"/>
+    <child link="link1"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-2.792527" upper="2.792527" effort="20.0" velocity="1.5"/>
+    <dynamics damping="0.15" friction="0.05"/>
+  </joint>
+
+  <joint name="joint2_to_joint1" type="revolute">
+    <parent link="link1"/>
+    <child link="link2"/>
+    <origin xyz="0 0 0.038" rpy="-1.5708 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.3089" upper="2.0943" effort="20.0" velocity="1.5"/>
+    <dynamics damping="0.15" friction="0.05"/>
+  </joint>
+
+  <joint name="joint3_to_joint2" type="revolute">
+    <parent link="link2"/>
+    <child link="link3"/>
+    <origin xyz="0 -0.1 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.0543" upper="1.1344" effort="20.0" velocity="1.5"/>
+    <dynamics damping="0.15" friction="0.05"/>
+  </joint>
+
+  <joint name="joint4_to_joint3" type="revolute">
+    <parent link="link3"/>
+    <child link="link4"/>
+    <origin xyz="0.108 -0.005 -0.001" rpy="0 1.5708 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-2.7052" upper="2.7052" effort="15.0" velocity="1.5"/>
+    <dynamics damping="0.10" friction="0.04"/>
+  </joint>
+
+  <joint name="joint5_to_joint4" type="revolute">
+    <parent link="link4"/>
+    <child link="link5"/>
+    <origin xyz="-0.001 0 0" rpy="0 -1.5708 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-2.0071" upper="2.0071" effort="12.0" velocity="1.5"/>
+    <dynamics damping="0.10" friction="0.04"/>
+  </joint>
+
+  <joint name="joint6_to_joint5" type="revolute">
+    <parent link="link5"/>
+    <child link="link6"/>
+    <origin xyz="0.06 0 0" rpy="0 1.5708 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14" upper="3.14" effort="10.0" velocity="1.5"/>
+    <dynamics damping="0.08" friction="0.03"/>
+  </joint>
+
+</robot>

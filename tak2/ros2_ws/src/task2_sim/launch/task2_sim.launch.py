@@ -18,10 +18,6 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
 
-    # ---------------------------------------------------------
-    # Package paths
-    # ---------------------------------------------------------
-
     task2_share = Path(
         get_package_share_directory(
             'task2_sim'
@@ -34,35 +30,21 @@ def generate_launch_description():
         )
     )
 
-    # ---------------------------------------------------------
-    # Task 2 world
-    # ---------------------------------------------------------
-
     world_file = (
         task2_share
         / 'worlds'
         / 'task2_world.sdf'
     )
 
-    # ---------------------------------------------------------
-    # Official Elephant Robotics MechArm 270 model
-    # ---------------------------------------------------------
-
     robot_urdf = (
-        description_share
+        task2_share
         / 'urdf'
-        / 'mecharm_270_m5'
-        / 'mecharm_270_m5.urdf'
+        / 'mecharm_270_gazebo.urdf'
     )
 
     robot_description = (
         robot_urdf.read_text()
     )
-
-    # ---------------------------------------------------------
-    # Let Gazebo resolve package://mycobot_description/...
-    # mesh paths.
-    # ---------------------------------------------------------
 
     resource_path = str(
         description_share.parent
@@ -80,16 +62,10 @@ def generate_launch_description():
             + existing_resource_path
         )
 
-    set_gazebo_resource_path = (
-        SetEnvironmentVariable(
-            name='IGN_GAZEBO_RESOURCE_PATH',
-            value=resource_path,
-        )
+    set_gazebo_resource_path = SetEnvironmentVariable(
+        name='IGN_GAZEBO_RESOURCE_PATH',
+        value=resource_path,
     )
-
-    # ---------------------------------------------------------
-    # Start Gazebo server
-    # ---------------------------------------------------------
 
     gazebo_server = ExecuteProcess(
         cmd=[
@@ -101,10 +77,6 @@ def generate_launch_description():
         ],
         output='screen',
     )
-
-    # ---------------------------------------------------------
-    # Bridge Gazebo simulation time to ROS 2
-    # ---------------------------------------------------------
 
     clock_bridge = Node(
         package='ros_ign_bridge',
@@ -118,10 +90,6 @@ def generate_launch_description():
 
         output='screen',
     )
-
-    # ---------------------------------------------------------
-    # Publish the URDF and TF tree
-    # ---------------------------------------------------------
 
     robot_state_publisher = Node(
         package='robot_state_publisher',
@@ -141,14 +109,6 @@ def generate_launch_description():
 
         output='screen',
     )
-
-    # ---------------------------------------------------------
-    # Spawn the official MechArm 270 URDF directly through
-    # Gazebo's EntityFactory service.
-    #
-    # This avoids ros_gz_sim / ros_ign_gazebo, whose Humble
-    # binary is not available for this Jetson ARM64 target.
-    # ---------------------------------------------------------
 
     spawn_request = (
         'sdf_filename: "'
@@ -188,19 +148,12 @@ def generate_launch_description():
         output='screen',
     )
 
-    # Gazebo needs a short time to load the world before the
-    # entity creation service is called.
     delayed_robot_spawn = TimerAction(
         period=3.0,
-
         actions=[
             spawn_robot,
         ],
     )
-
-    # ---------------------------------------------------------
-    # Current complete Task 2 simulation launch
-    # ---------------------------------------------------------
 
     return LaunchDescription([
         set_gazebo_resource_path,

@@ -7,7 +7,7 @@ package_name = 'task2_sim'
 
 setup(
     name=package_name,
-    version='0.1.0',
+    version='0.3.0',
 
     packages=find_packages(
         exclude=['test']
@@ -33,6 +33,10 @@ setup(
         (
             'share/' + package_name + '/config',
             glob('config/*.yaml'),
+        ),
+        (
+            'share/' + package_name + '/urdf',
+            glob('urdf/*.urdf'),
         ),
     ],
 
