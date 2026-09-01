@@ -176,18 +176,11 @@ def generate_launch_description():
         ],
     )
 
-    joint_controller = Node(
-        package='task2_sim',
-
-        executable='joint_controller',
-
-        name='task2_joint_controller',
-
-        parameters=[
-            {
-                'use_sim_time':
-                    True,
-            }
+    joint_controller = ExecuteProcess(
+        cmd=[
+            'python3',
+            '-m',
+            'task2_sim.joint_controller',
         ],
 
         output='screen',
