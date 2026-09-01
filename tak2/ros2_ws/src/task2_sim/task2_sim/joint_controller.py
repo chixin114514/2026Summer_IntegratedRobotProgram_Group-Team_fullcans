@@ -15,7 +15,7 @@ class JointController(Node):
             'task2_joint_controller'
         )
 
-        self.publishers = []
+        self.joint_publishers = []
 
         for index in range(1, 7):
 
@@ -29,7 +29,7 @@ class JointController(Node):
                 10,
             )
 
-            self.publishers.append(
+            self.joint_publishers.append(
                 publisher
             )
 
@@ -68,7 +68,7 @@ class JointController(Node):
             )
 
         for publisher, target in zip(
-            self.publishers,
+            self.joint_publishers,
             targets,
         ):
 
