@@ -1,5 +1,9 @@
 from glob import glob
-from setuptools import find_packages, setup
+
+from setuptools import (
+    find_packages,
+    setup,
+)
 
 
 package_name = 'task2_sim'
@@ -7,7 +11,8 @@ package_name = 'task2_sim'
 
 setup(
     name=package_name,
-    version='0.3.0',
+
+    version='0.4.0',
 
     packages=find_packages(
         exclude=['test']
@@ -16,27 +21,44 @@ setup(
     data_files=[
         (
             'share/ament_index/resource_index/packages',
-            ['resource/' + package_name],
+            [
+                'resource/' + package_name
+            ],
         ),
+
         (
             'share/' + package_name,
-            ['package.xml'],
+            [
+                'package.xml'
+            ],
         ),
+
         (
             'share/' + package_name + '/launch',
-            glob('launch/*.launch.py'),
+            glob(
+                'launch/*.launch.py'
+            ),
         ),
+
         (
             'share/' + package_name + '/worlds',
-            glob('worlds/*.sdf'),
+            glob(
+                'worlds/*.sdf'
+            ),
         ),
+
         (
             'share/' + package_name + '/config',
-            glob('config/*.yaml'),
+            glob(
+                'config/*.yaml'
+            ),
         ),
+
         (
             'share/' + package_name + '/urdf',
-            glob('urdf/*.urdf'),
+            glob(
+                'urdf/*.urdf'
+            ),
         ),
     ],
 
@@ -46,9 +68,13 @@ setup(
 
     zip_safe=True,
 
-    maintainer='Integrated Robot Program Group Team',
+    maintainer=(
+        'Integrated Robot Program Group Team'
+    ),
 
-    maintainer_email='team@example.com',
+    maintainer_email=(
+        'team@example.com'
+    ),
 
     description=(
         'Fixed-point pick-and-place simulation '
@@ -58,6 +84,11 @@ setup(
     license='MIT',
 
     entry_points={
-        'console_scripts': [],
+        'console_scripts': [
+            (
+                'joint_controller = '
+                'task2_sim.joint_controller:main'
+            ),
+        ],
     },
 )

@@ -240,4 +240,126 @@
     <dynamics damping="0.08" friction="0.03"/>
   </joint>
 
+
+  <!-- ======================================================= -->
+  <!-- Gazebo joint position controllers                       -->
+  <!-- ======================================================= -->
+
+  <gazebo>
+
+    <plugin
+      filename="ignition-gazebo-joint-position-controller-system"
+      name="ignition::gazebo::systems::JointPositionController">
+
+      <joint_name>joint1_to_base</joint_name>
+      <topic>/task2/joint1/cmd_pos</topic>
+
+      <p_gain>8.0</p_gain>
+      <i_gain>0.1</i_gain>
+      <d_gain>0.4</d_gain>
+
+      <cmd_max>20.0</cmd_max>
+      <cmd_min>-20.0</cmd_min>
+
+      <initial_position>0.0</initial_position>
+
+    </plugin>
+
+
+    <plugin
+      filename="ignition-gazebo-joint-position-controller-system"
+      name="ignition::gazebo::systems::JointPositionController">
+
+      <joint_name>joint2_to_joint1</joint_name>
+      <topic>/task2/joint2/cmd_pos</topic>
+
+      <p_gain>8.0</p_gain>
+      <i_gain>0.1</i_gain>
+      <d_gain>0.4</d_gain>
+
+      <cmd_max>20.0</cmd_max>
+      <cmd_min>-20.0</cmd_min>
+
+      <initial_position>0.0</initial_position>
+
+    </plugin>
+
+
+    <plugin
+      filename="ignition-gazebo-joint-position-controller-system"
+      name="ignition::gazebo::systems::JointPositionController">
+
+      <joint_name>joint3_to_joint2</joint_name>
+      <topic>/task2/joint3/cmd_pos</topic>
+
+      <p_gain>8.0</p_gain>
+      <i_gain>0.1</i_gain>
+      <d_gain>0.4</d_gain>
+
+      <cmd_max>20.0</cmd_max>
+      <cmd_min>-20.0</cmd_min>
+
+      <initial_position>0.0</initial_position>
+
+    </plugin>
+
+
+    <plugin
+      filename="ignition-gazebo-joint-position-controller-system"
+      name="ignition::gazebo::systems::JointPositionController">
+
+      <joint_name>joint4_to_joint3</joint_name>
+      <topic>/task2/joint4/cmd_pos</topic>
+
+      <p_gain>5.0</p_gain>
+      <i_gain>0.05</i_gain>
+      <d_gain>0.25</d_gain>
+
+      <cmd_max>15.0</cmd_max>
+      <cmd_min>-15.0</cmd_min>
+
+      <initial_position>0.0</initial_position>
+
+    </plugin>
+
+
+    <plugin
+      filename="ignition-gazebo-joint-position-controller-system"
+      name="ignition::gazebo::systems::JointPositionController">
+
+      <joint_name>joint5_to_joint4</joint_name>
+      <topic>/task2/joint5/cmd_pos</topic>
+
+      <p_gain>5.0</p_gain>
+      <i_gain>0.05</i_gain>
+      <d_gain>0.25</d_gain>
+
+      <cmd_max>12.0</cmd_max>
+      <cmd_min>-12.0</cmd_min>
+
+      <initial_position>0.0</initial_position>
+
+    </plugin>
+
+
+    <plugin
+      filename="ignition-gazebo-joint-position-controller-system"
+      name="ignition::gazebo::systems::JointPositionController">
+
+      <joint_name>joint6_to_joint5</joint_name>
+      <topic>/task2/joint6/cmd_pos</topic>
+
+      <p_gain>4.0</p_gain>
+      <i_gain>0.05</i_gain>
+      <d_gain>0.20</d_gain>
+
+      <cmd_max>10.0</cmd_max>
+      <cmd_min>-10.0</cmd_min>
+
+      <initial_position>0.0</initial_position>
+
+    </plugin>
+
+  </gazebo>
+
 </robot>

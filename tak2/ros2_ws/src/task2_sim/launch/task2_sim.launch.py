@@ -1,4 +1,5 @@
 import os
+
 from pathlib import Path
 
 from ament_index_python.packages import (
@@ -56,15 +57,18 @@ def generate_launch_description():
     )
 
     if existing_resource_path:
+
         resource_path = (
             resource_path
             + ':'
             + existing_resource_path
         )
 
-    set_gazebo_resource_path = SetEnvironmentVariable(
-        name='IGN_GAZEBO_RESOURCE_PATH',
-        value=resource_path,
+    set_gazebo_resource_path = (
+        SetEnvironmentVariable(
+            name='IGN_GAZEBO_RESOURCE_PATH',
+            value=resource_path,
+        )
     )
 
     gazebo_server = ExecuteProcess(
@@ -75,24 +79,41 @@ def generate_launch_description():
             '-r',
             str(world_file),
         ],
+
         output='screen',
     )
 
-    clock_bridge = Node(
-        package='ros_ign_bridge',
-        executable='parameter_bridge',
-
-        arguments=[
+    bridge_arguments = [
+        (
             '/clock'
             '@rosgraph_msgs/msg/Clock'
             '[ignition.msgs.Clock'
-        ],
+        ),
+    ]
+
+    for index in range(1, 7):
+
+        bridge_arguments.append(
+            (
+                f'/task2/joint{index}/cmd_pos'
+                '@std_msgs/msg/Float64'
+                ']ignition.msgs.Double'
+            )
+        )
+
+    gazebo_bridge = Node(
+        package='ros_ign_bridge',
+
+        executable='parameter_bridge',
+
+        arguments=bridge_arguments,
 
         output='screen',
     )
 
     robot_state_publisher = Node(
         package='robot_state_publisher',
+
         executable='robot_state_publisher',
 
         name='robot_state_publisher',
@@ -150,15 +171,42 @@ def generate_launch_description():
 
     delayed_robot_spawn = TimerAction(
         period=3.0,
+
         actions=[
             spawn_robot,
+        ],
+    )
+
+    joint_controller = Node(
+        package='task2_sim',
+
+        executable='joint_controller',
+
+        name='task2_joint_controller',
+
+        parameters=[
+            {
+                'use_sim_time':
+                    True,
+            }
+        ],
+
+        output='screen',
+    )
+
+    delayed_joint_controller = TimerAction(
+        period=5.0,
+
+        actions=[
+            joint_controller,
         ],
     )
 
     return LaunchDescription([
         set_gazebo_resource_path,
         gazebo_server,
-        clock_bridge,
+        gazebo_bridge,
         robot_state_publisher,
         delayed_robot_spawn,
+        delayed_joint_controller,
     ])
