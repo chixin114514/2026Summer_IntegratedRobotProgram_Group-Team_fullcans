@@ -75,7 +75,6 @@ def generate_launch_description():
         cmd=[
             'ign',
             'gazebo',
-            '-s',
             '-r',
             str(world_file),
         ],
