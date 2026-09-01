@@ -101,6 +101,19 @@ def generate_launch_description():
         )
 
     bridge_arguments.append(
+        '/task2/gripper/left_cmd_pos'
+        '@std_msgs/msg/Float64'
+        ']ignition.msgs.Double'
+    )
+
+    bridge_arguments.append(
+        '/task2/gripper/right_cmd_pos'
+        '@std_msgs/msg/Float64'
+        ']ignition.msgs.Double'
+    )
+
+
+    bridge_arguments.append(
         '/task2/gripper/attach'
         '@std_msgs/msg/Empty'
         ']ignition.msgs.Empty'

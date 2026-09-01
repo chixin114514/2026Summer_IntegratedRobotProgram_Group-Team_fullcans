@@ -298,11 +298,240 @@
   </gazebo>
 
 
+
   <!-- ====================================================== -->
-  <!-- Virtual physical gripper                               -->
+  <!-- Physical two-finger gripper                            -->
+  <!-- ====================================================== -->
+
+  <link name="gripper_palm">
+
+    <visual>
+      <origin xyz="0 0 0.0075"/>
+      <geometry>
+        <box size="0.078 0.026 0.015"/>
+      </geometry>
+      <material name="gripper_dark">
+        <color rgba="0.12 0.12 0.14 1"/>
+      </material>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0.0075"/>
+      <geometry>
+        <box size="0.078 0.026 0.015"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <origin xyz="0 0 0.0075"/>
+      <mass value="0.08"/>
+      <inertia
+        ixx="0.00008"
+        ixy="0"
+        ixz="0"
+        iyy="0.00008"
+        iyz="0"
+        izz="0.00008"/>
+    </inertial>
+
+  </link>
+
+
+  <!-- Mount palm on joint 6 -->
+
+  <joint name="gripper_mount" type="fixed">
+
+    <parent link="link6"/>
+    <child link="gripper_palm"/>
+
+    <origin
+      xyz="0 0 0.005"
+      rpy="0 0 0"/>
+
+  </joint>
+
+
+  <!-- ====================================================== -->
+  <!-- Left finger                                            -->
+  <!-- ====================================================== -->
+
+  <link name="left_finger">
+
+    <visual>
+      <origin xyz="0 0 0.0275"/>
+      <geometry>
+        <box size="0.008 0.014 0.055"/>
+      </geometry>
+      <material name="gripper_dark"/>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0.0275"/>
+      <geometry>
+        <box size="0.008 0.014 0.055"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <origin xyz="0 0 0.0275"/>
+      <mass value="0.025"/>
+      <inertia
+        ixx="0.00002"
+        ixy="0"
+        ixz="0"
+        iyy="0.00002"
+        iyz="0"
+        izz="0.00001"/>
+    </inertial>
+
+  </link>
+
+
+  <joint
+    name="left_finger_joint"
+    type="prismatic">
+
+    <parent link="gripper_palm"/>
+    <child link="left_finger"/>
+
+    <origin
+      xyz="0.035 0 0.015"
+      rpy="0 0 0"/>
+
+    <!-- Positive motion moves toward centre -->
+    <axis xyz="-1 0 0"/>
+
+    <limit
+      lower="0.0"
+      upper="0.010"
+      effort="30"
+      velocity="0.04"/>
+
+    <dynamics
+      damping="1.0"
+      friction="0.5"/>
+
+  </joint>
+
+
+  <!-- ====================================================== -->
+  <!-- Right finger                                           -->
+  <!-- ====================================================== -->
+
+  <link name="right_finger">
+
+    <visual>
+      <origin xyz="0 0 0.0275"/>
+      <geometry>
+        <box size="0.008 0.014 0.055"/>
+      </geometry>
+      <material name="gripper_dark"/>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0.0275"/>
+      <geometry>
+        <box size="0.008 0.014 0.055"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <origin xyz="0 0 0.0275"/>
+      <mass value="0.025"/>
+      <inertia
+        ixx="0.00002"
+        ixy="0"
+        ixz="0"
+        iyy="0.00002"
+        iyz="0"
+        izz="0.00001"/>
+    </inertial>
+
+  </link>
+
+
+  <joint
+    name="right_finger_joint"
+    type="prismatic">
+
+    <parent link="gripper_palm"/>
+    <child link="right_finger"/>
+
+    <origin
+      xyz="-0.035 0 0.015"
+      rpy="0 0 0"/>
+
+    <!-- Positive motion moves toward centre -->
+    <axis xyz="1 0 0"/>
+
+    <limit
+      lower="0.0"
+      upper="0.010"
+      effort="30"
+      velocity="0.04"/>
+
+    <dynamics
+      damping="1.0"
+      friction="0.5"/>
+
+  </joint>
+
+
+  <!-- ====================================================== -->
+  <!-- Finger position controllers                            -->
+  <!-- ====================================================== -->
+
+  <gazebo>
+
+    <plugin
+      filename="ignition-gazebo-joint-position-controller-system"
+      name="ignition::gazebo::systems::JointPositionController">
+
+      <joint_name>
+        left_finger_joint
+      </joint_name>
+
+      <topic>
+        /task2/gripper/left_cmd_pos
+      </topic>
+
+      <p_gain>120.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>5.0</d_gain>
+
+      <initial_position>0.0</initial_position>
+
+    </plugin>
+
+
+    <plugin
+      filename="ignition-gazebo-joint-position-controller-system"
+      name="ignition::gazebo::systems::JointPositionController">
+
+      <joint_name>
+        right_finger_joint
+      </joint_name>
+
+      <topic>
+        /task2/gripper/right_cmd_pos
+      </topic>
+
+      <p_gain>120.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>5.0</d_gain>
+
+      <initial_position>0.0</initial_position>
+
+    </plugin>
+
+  </gazebo>
+
+
+  <!-- ====================================================== -->
+  <!-- Stable grasp attachment                                -->
   <!--                                                        -->
-  <!-- The object is rigidly attached to link6 while grasped. -->
-  <!-- This models a closed gripper / magnetic gripper.       -->
+  <!-- Physical fingers visibly close first.                  -->
+  <!-- Then this fixed joint stabilises the grasp in Gazebo.  -->
   <!-- ====================================================== -->
 
   <gazebo>
@@ -311,7 +540,9 @@
       filename="ignition-gazebo-detachable-joint-system"
       name="ignition::gazebo::systems::DetachableJoint">
 
-      <parent_link>link6</parent_link>
+      <parent_link>
+        gripper_palm
+      </parent_link>
 
       <child_model>
         target_object
@@ -336,5 +567,6 @@
     </plugin>
 
   </gazebo>
+
 
 </robot>

@@ -48,6 +48,13 @@ SAFE_Z = 0.110
 # Maximum permitted tool-position error when grasping.
 GRASP_TOLERANCE = 0.025
 
+# Physical finger travel in metres.
+#
+# 0.000 = fully open.
+# ~0.0055 = around a 50 mm cube.
+GRIPPER_OPEN = 0.0000
+GRIPPER_CLOSED = 0.0055
+
 
 # Manually calibrated pose from the tuning panel.
 A_CALIBRATION_SEED = [
@@ -114,6 +121,29 @@ class AutoPickPlace(Node):
                 10,
             )
         )
+
+        # Physical two-finger gripper publishers.
+
+        self.left_finger_pub = (
+            self.create_publisher(
+                Float64,
+                '/task2/gripper/left_cmd_pos',
+                10,
+            )
+        )
+
+        self.right_finger_pub = (
+            self.create_publisher(
+                Float64,
+                '/task2/gripper/right_cmd_pos',
+                10,
+            )
+        )
+
+        self.gripper_position = (
+            GRIPPER_OPEN
+        )
+
 
         # -----------------------------------------------------
         # Automatically solve all required Cartesian points.
@@ -267,10 +297,17 @@ class AutoPickPlace(Node):
             ),
 
             (
+                'CLOSE_GRIPPER',
+                None,
+                0.0,
+                1.2,
+            ),
+
+            (
                 'GRASP',
                 None,
                 0.0,
-                1.5,
+                0.6,
             ),
 
             (
@@ -298,7 +335,14 @@ class AutoPickPlace(Node):
                 'RELEASE',
                 None,
                 0.0,
-                1.5,
+                0.4,
+            ),
+
+            (
+                'OPEN_GRIPPER',
+                None,
+                0.0,
+                1.2,
             ),
 
             (
@@ -566,6 +610,42 @@ class AutoPickPlace(Node):
     # Gripper
     # ========================================================
 
+    def publish_gripper(self):
+
+        msg_left = Float64()
+        msg_right = Float64()
+
+        msg_left.data = float(
+            self.gripper_position
+        )
+
+        msg_right.data = float(
+            self.gripper_position
+        )
+
+        self.left_finger_pub.publish(
+            msg_left
+        )
+
+        self.right_finger_pub.publish(
+            msg_right
+        )
+
+    def set_gripper(
+        self,
+        position,
+    ):
+
+        self.gripper_position = max(
+            0.0,
+            min(
+                0.010,
+                float(position),
+            ),
+        )
+
+        self.publish_gripper()
+
     def detach_object(self):
 
         self.detach_pub.publish(
@@ -634,6 +714,11 @@ class AutoPickPlace(Node):
 
     def update(self):
 
+        # Continuously hold the current physical
+        # gripper opening.
+
+        self.publish_gripper()
+
         # -----------------------------------------------------
         # Initial release of detachable joint.
         # Send it several times while Gazebo plugins initialise.
@@ -697,6 +782,22 @@ class AutoPickPlace(Node):
                     motion_time,
                 )
 
+            elif name == 'CLOSE_GRIPPER':
+
+                self.set_gripper(
+                    GRIPPER_CLOSED
+                )
+
+                self.get_logger().info(
+                    'GRIPPER: closing physical fingers.'
+                )
+
+                self.hold_until = (
+                    self.now_seconds()
+                    +
+                    hold_time
+                )
+
             elif name == 'GRASP':
 
                 self.attach_object()
@@ -710,6 +811,22 @@ class AutoPickPlace(Node):
             elif name == 'RELEASE':
 
                 self.detach_object()
+
+                self.hold_until = (
+                    self.now_seconds()
+                    +
+                    hold_time
+                )
+
+            elif name == 'OPEN_GRIPPER':
+
+                self.set_gripper(
+                    GRIPPER_OPEN
+                )
+
+                self.get_logger().info(
+                    'GRIPPER: opening physical fingers.'
+                )
 
                 self.hold_until = (
                     self.now_seconds()
