@@ -297,4 +297,44 @@
     </plugin>
   </gazebo>
 
+
+  <!-- ====================================================== -->
+  <!-- Virtual physical gripper                               -->
+  <!--                                                        -->
+  <!-- The object is rigidly attached to link6 while grasped. -->
+  <!-- This models a closed gripper / magnetic gripper.       -->
+  <!-- ====================================================== -->
+
+  <gazebo>
+
+    <plugin
+      filename="ignition-gazebo-detachable-joint-system"
+      name="ignition::gazebo::systems::DetachableJoint">
+
+      <parent_link>link6</parent_link>
+
+      <child_model>
+        target_object
+      </child_model>
+
+      <child_model_link>
+        object_link
+      </child_model_link>
+
+      <detach_topic>
+        /task2/gripper/detach
+      </detach_topic>
+
+      <attach_topic>
+        /task2/gripper/attach
+      </attach_topic>
+
+      <output_topic>
+        /task2/gripper/state
+      </output_topic>
+
+    </plugin>
+
+  </gazebo>
+
 </robot>
