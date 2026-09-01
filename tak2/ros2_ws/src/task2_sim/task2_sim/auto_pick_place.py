@@ -53,7 +53,7 @@ GRASP_TOLERANCE = 0.025
 # 0.000 = fully open.
 # ~0.0055 = around a 50 mm cube.
 GRIPPER_OPEN = 0.0000
-GRIPPER_CLOSED = 0.0055
+GRIPPER_CLOSED = 0.0080
 
 
 # Manually calibrated pose from the tuning panel.

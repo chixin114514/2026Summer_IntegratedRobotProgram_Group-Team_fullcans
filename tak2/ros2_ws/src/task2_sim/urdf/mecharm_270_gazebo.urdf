@@ -404,7 +404,7 @@
     <limit
       lower="0.0"
       upper="0.010"
-      effort="30"
+      effort="60"
       velocity="0.04"/>
 
     <dynamics
@@ -467,7 +467,7 @@
     <limit
       lower="0.0"
       upper="0.010"
-      effort="30"
+      effort="60"
       velocity="0.04"/>
 
     <dynamics
@@ -495,9 +495,9 @@
         /task2/gripper/left_cmd_pos
       </topic>
 
-      <p_gain>120.0</p_gain>
+      <p_gain>250.0</p_gain>
       <i_gain>0.0</i_gain>
-      <d_gain>5.0</d_gain>
+      <d_gain>8.0</d_gain>
 
       <initial_position>0.0</initial_position>
 
@@ -516,9 +516,9 @@
         /task2/gripper/right_cmd_pos
       </topic>
 
-      <p_gain>120.0</p_gain>
+      <p_gain>250.0</p_gain>
       <i_gain>0.0</i_gain>
-      <d_gain>5.0</d_gain>
+      <d_gain>8.0</d_gain>
 
       <initial_position>0.0</initial_position>
 
@@ -566,6 +566,28 @@
 
     </plugin>
 
+  </gazebo>
+
+
+
+  <!-- High-friction rubber-like finger surfaces -->
+
+  <gazebo reference="left_finger">
+    <mu1>4.0</mu1>
+    <mu2>4.0</mu2>
+    <kp>1000000.0</kp>
+    <kd>100.0</kd>
+    <minDepth>0.001</minDepth>
+    <maxVel>0.02</maxVel>
+  </gazebo>
+
+  <gazebo reference="right_finger">
+    <mu1>4.0</mu1>
+    <mu2>4.0</mu2>
+    <kp>1000000.0</kp>
+    <kd>100.0</kd>
+    <minDepth>0.001</minDepth>
+    <maxVel>0.02</maxVel>
   </gazebo>
 
 
