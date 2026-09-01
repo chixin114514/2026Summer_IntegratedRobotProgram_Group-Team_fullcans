@@ -1,5 +1,21 @@
 <?xml version="1.0"?>
 <robot  xmlns:xacro="http://www.ros.org/wiki/xacro" name="firefighter" >
+
+  <!--
+    Physical mounting condition:
+    the real MechArm base is rigidly fixed to the workbench.
+    Gazebo therefore fixes the robot base to the world.
+  -->
+
+  <link name="world"/>
+
+  <joint name="world_fixed" type="fixed">
+    <parent link="world"/>
+    <child link="base"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+
 	
 <xacro:property name="width" value=".2" />
 

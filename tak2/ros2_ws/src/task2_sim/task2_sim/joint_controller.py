@@ -16,20 +16,16 @@ class JointController(Node):
         )
 
         # -----------------------------------------------------
-        # Six Gazebo joint command publishers
+        # ROS -> Gazebo publishers
         # -----------------------------------------------------
 
         self.joint_publishers = []
 
         for index in range(1, 7):
 
-            topic = (
-                f'/task2/joint{index}/cmd_pos'
-            )
-
             publisher = self.create_publisher(
                 Float64,
-                topic,
+                f'/task2/joint{index}/cmd_pos',
                 10,
             )
 
@@ -38,7 +34,7 @@ class JointController(Node):
             )
 
         # -----------------------------------------------------
-        # Joint limits from the MechArm 270 description
+        # MechArm joint limits
         # -----------------------------------------------------
 
         self.lower_limits = [
@@ -59,24 +55,27 @@ class JointController(Node):
             3.14,
         ]
 
-        # -----------------------------------------------------
-        # Fixed-point pick-and-place joint waypoints
-        #
-        # The A/B points in the scene are approximately:
-        #
-        # A: x = 0.18, y = +0.10
-        # B: x = 0.18, y = -0.10
-        #
-        # Therefore joint 1 is mirrored around the robot centre:
-        #
-        # A side: +29 deg
-        # B side: -29 deg
-        #
-        # The remaining joints define approach, lower and lift
-        # postures.
-        # -----------------------------------------------------
-
         d = math.radians
+
+        # Gazebo initially creates all six joints at zero.
+        self.current_pose = [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+        ]
+
+        # -----------------------------------------------------
+        # Task waypoints
+        #
+        # motion_time:
+        #     time spent smoothly moving to the pose
+        #
+        # hold_time:
+        #     time spent stationary after reaching the pose
+        # -----------------------------------------------------
 
         self.waypoints = [
 
@@ -90,7 +89,8 @@ class JointController(Node):
                     d(90),
                     d(0),
                 ],
-                4.0,
+                5.0,
+                2.0,
             ),
 
             (
@@ -103,7 +103,8 @@ class JointController(Node):
                     d(70),
                     d(0),
                 ],
-                4.0,
+                5.0,
+                1.5,
             ),
 
             (
@@ -117,6 +118,7 @@ class JointController(Node):
                     d(0),
                 ],
                 4.0,
+                1.5,
             ),
 
             (
@@ -129,6 +131,7 @@ class JointController(Node):
                     d(58),
                     d(0),
                 ],
+                0.0,
                 2.0,
             ),
 
@@ -143,6 +146,7 @@ class JointController(Node):
                     d(0),
                 ],
                 4.0,
+                1.5,
             ),
 
             (
@@ -155,7 +159,8 @@ class JointController(Node):
                     d(68),
                     d(0),
                 ],
-                4.0,
+                6.0,
+                1.5,
             ),
 
             (
@@ -169,6 +174,7 @@ class JointController(Node):
                     d(0),
                 ],
                 4.0,
+                1.5,
             ),
 
             (
@@ -181,6 +187,7 @@ class JointController(Node):
                     d(58),
                     d(0),
                 ],
+                0.0,
                 2.0,
             ),
 
@@ -195,6 +202,7 @@ class JointController(Node):
                     d(0),
                 ],
                 4.0,
+                1.5,
             ),
 
             (
@@ -207,35 +215,65 @@ class JointController(Node):
                     d(90),
                     d(0),
                 ],
-                4.0,
+                5.0,
+                2.0,
             ),
         ]
 
         # -----------------------------------------------------
-        # State machine
+        # Trajectory state
         # -----------------------------------------------------
 
-        self.current_step = -1
+        self.step_index = -1
 
-        self.wait_until = (
-            self.get_clock()
-            .now()
+        self.start_pose = list(
+            self.current_pose
         )
 
-        # Run the state machine at 10 Hz.
-        self.timer = self.create_timer(
-            0.1,
-            self.run_sequence,
+        self.target_pose = list(
+            self.current_pose
         )
+
+        self.motion_start_time = 0.0
+
+        self.motion_duration = 0.0
+
+        self.hold_duration = 0.0
+
+        self.hold_start_time = None
+
+        self.state_name = ''
 
         self.finished = False
 
+        # 20 Hz command update.
+        #
+        # The robot therefore receives many small position
+        # changes instead of one large instantaneous jump.
+        self.timer = self.create_timer(
+            0.05,
+            self.update,
+        )
+
         self.get_logger().info(
-            'Task 2 pick-and-place sequence started.'
+            'Task 2 physics-aware motion controller started.'
         )
 
     # ---------------------------------------------------------
-    # Safety check
+    # Time helper
+    # ---------------------------------------------------------
+
+    def now_seconds(self):
+
+        return (
+            self.get_clock()
+            .now()
+            .nanoseconds
+            / 1e9
+        )
+
+    # ---------------------------------------------------------
+    # Joint-limit safety
     # ---------------------------------------------------------
 
     def validate_targets(
@@ -262,135 +300,266 @@ class JointController(Node):
             start=1,
         ):
 
-            if not (
-                lower
-                <= target
-                <= upper
-            ):
+            if target < lower or target > upper:
 
                 raise ValueError(
                     f'Joint {index} target '
-                    f'{target:.3f} rad is outside '
+                    f'{target:.3f} rad exceeds '
                     f'[{lower:.3f}, {upper:.3f}]'
                 )
 
     # ---------------------------------------------------------
-    # Publish one six-joint posture
+    # Send one position command
     # ---------------------------------------------------------
 
-    def send_joint_targets(
+    def publish_pose(
         self,
-        targets,
+        pose,
     ):
 
         self.validate_targets(
-            targets
+            pose
         )
 
-        for publisher, target in zip(
+        for publisher, value in zip(
             self.joint_publishers,
-            targets,
+            pose,
         ):
 
-            message = Float64()
+            msg = Float64()
 
-            message.data = float(
-                target
+            msg.data = float(
+                value
             )
 
             publisher.publish(
-                message
+                msg
             )
 
     # ---------------------------------------------------------
-    # Start the next state
+    # Start one motion stage
     # ---------------------------------------------------------
 
     def start_next_step(self):
 
-        self.current_step += 1
+        self.step_index += 1
 
-        if (
-            self.current_step
-            >= len(
-                self.waypoints
-            )
+        if self.step_index >= len(
+            self.waypoints
         ):
 
             self.finished = True
 
             self.get_logger().info(
-                'Task 2 sequence completed.'
+                'Task 2 motion sequence completed.'
             )
 
             return
 
         (
-            state_name,
-            targets,
-            wait_seconds,
+            self.state_name,
+            target,
+            motion_time,
+            hold_time,
         ) = self.waypoints[
-            self.current_step
+            self.step_index
         ]
 
-        self.send_joint_targets(
-            targets
+        self.validate_targets(
+            target
         )
+
+        self.start_pose = list(
+            self.current_pose
+        )
+
+        self.target_pose = list(
+            target
+        )
+
+        self.motion_start_time = (
+            self.now_seconds()
+        )
+
+        self.motion_duration = float(
+            motion_time
+        )
+
+        self.hold_duration = float(
+            hold_time
+        )
+
+        self.hold_start_time = None
 
         self.get_logger().info(
-            f'State: {state_name}'
-        )
-
-        # These two states currently represent the future
-        # gripper actions. The next development stage will
-        # replace them with real gripper open/close commands.
-
-        if state_name == 'GRASP':
-
-            self.get_logger().info(
-                'Grasp hold point reached.'
-            )
-
-        elif state_name == 'RELEASE':
-
-            self.get_logger().info(
-                'Release hold point reached.'
-            )
-
-        now = (
-            self.get_clock()
-            .now()
-        )
-
-        self.wait_until = (
-            now
-            +
-            rclpy.duration.Duration(
-                seconds=wait_seconds
-            )
+            f'State: {self.state_name}'
         )
 
     # ---------------------------------------------------------
-    # Non-blocking state machine
+    # Smooth interpolation
     # ---------------------------------------------------------
 
-    def run_sequence(self):
+    def smooth_interpolate(
+        self,
+        start,
+        target,
+        progress,
+    ):
+
+        # Cubic smoothstep:
+        #
+        # s(0) = 0
+        # s(1) = 1
+        #
+        # velocity also approaches zero at the beginning
+        # and end of each movement.
+
+        s = (
+            3.0 * progress * progress
+            -
+            2.0
+            * progress
+            * progress
+            * progress
+        )
+
+        return [
+            a + (b - a) * s
+            for a, b in zip(
+                start,
+                target,
+            )
+        ]
+
+    # ---------------------------------------------------------
+    # Main 20 Hz state machine
+    # ---------------------------------------------------------
+
+    def update(self):
 
         if self.finished:
             return
 
-        now = (
-            self.get_clock()
-            .now()
-        )
-
-        if self.current_step < 0:
+        if self.step_index < 0:
 
             self.start_next_step()
 
             return
 
-        if now >= self.wait_until:
+        now = self.now_seconds()
+
+        # -----------------------------------------------------
+        # States such as GRASP / RELEASE have no arm motion.
+        # -----------------------------------------------------
+
+        if self.motion_duration <= 0.0:
+
+            self.current_pose = list(
+                self.target_pose
+            )
+
+            self.publish_pose(
+                self.current_pose
+            )
+
+            if self.hold_start_time is None:
+
+                self.hold_start_time = now
+
+                if self.state_name == 'GRASP':
+
+                    self.get_logger().info(
+                        'Grasp hold reached.'
+                    )
+
+                elif self.state_name == 'RELEASE':
+
+                    self.get_logger().info(
+                        'Release hold reached.'
+                    )
+
+            if (
+                now
+                -
+                self.hold_start_time
+                >=
+                self.hold_duration
+            ):
+
+                self.start_next_step()
+
+            return
+
+        # -----------------------------------------------------
+        # Smooth physical movement
+        # -----------------------------------------------------
+
+        elapsed = (
+            now
+            -
+            self.motion_start_time
+        )
+
+        progress = (
+            elapsed
+            /
+            self.motion_duration
+        )
+
+        if progress < 1.0:
+
+            progress = max(
+                0.0,
+                progress,
+            )
+
+            commanded_pose = (
+                self.smooth_interpolate(
+                    self.start_pose,
+                    self.target_pose,
+                    progress,
+                )
+            )
+
+            self.current_pose = (
+                commanded_pose
+            )
+
+            self.publish_pose(
+                commanded_pose
+            )
+
+            return
+
+        # -----------------------------------------------------
+        # Target reached
+        # -----------------------------------------------------
+
+        self.current_pose = list(
+            self.target_pose
+        )
+
+        self.publish_pose(
+            self.current_pose
+        )
+
+        if self.hold_start_time is None:
+
+            self.hold_start_time = now
+
+            self.get_logger().info(
+                f'Reached: {self.state_name}'
+            )
+
+            return
+
+        if (
+            now
+            -
+            self.hold_start_time
+            >=
+            self.hold_duration
+        ):
 
             self.start_next_step()
 
