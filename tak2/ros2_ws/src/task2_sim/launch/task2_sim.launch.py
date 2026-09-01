@@ -178,7 +178,7 @@ def generate_launch_description():
 
     joint_controller = ExecuteProcess(
         cmd=[
-            'python3',
+            '/usr/bin/python3',
             '-m',
             'task2_sim.joint_controller',
         ],
