@@ -177,26 +177,34 @@ class AutoPickPlace(Node):
             )
         )
 
+        # -----------------------------------------------------
+        # B is geometrically symmetric with A.
+        #
+        # Do NOT solve B with an independent six-joint IK.
+        # A different IK branch can change wrist roll / pitch,
+        # causing the grasped cube to arrive at B tilted.
+        #
+        # Instead:
+        #   - preserve J2 ... J6 exactly;
+        #   - rotate only J1 around the vertical base axis.
+        #
+        # This preserves the cube's upright orientation.
+        # -----------------------------------------------------
+
         self.pose_b_pick = (
-            self.find_pose(
-                [
-                    PLACE_X,
-                    PLACE_Y,
-                    PICK_Z,
-                ],
-                B_CALIBRATION_SEED,
+            self.rotate_pose_to_xy(
+                self.pose_a_pick,
+                PLACE_X,
+                PLACE_Y,
                 'B_PLACE',
             )
         )
 
         self.pose_b_high = (
-            self.find_pose(
-                [
-                    PLACE_X,
-                    PLACE_Y,
-                    SAFE_Z,
-                ],
-                self.pose_b_pick,
+            self.rotate_pose_to_xy(
+                self.pose_a_high,
+                PLACE_X,
+                PLACE_Y,
                 'B_APPROACH',
             )
         )
@@ -327,28 +335,40 @@ class AutoPickPlace(Node):
             (
                 'B_PLACE',
                 self.pose_b_pick,
-                3.0,
-                1.0,
+                4.5,
+                2.0,
             ),
 
-            (
-                'RELEASE',
-                None,
-                0.0,
-                0.4,
-            ),
+            # Open the physical fingers first while the
+            # detachable joint still holds the cube rigidly.
+            #
+            # The fingers therefore cannot knock the cube over
+            # during release.
 
             (
                 'OPEN_GRIPPER',
                 None,
                 0.0,
-                1.2,
+                1.5,
             ),
+
+            # Only after both fingers are clear do we release
+            # the cube into Gazebo physics.
+
+            (
+                'RELEASE',
+                None,
+                0.0,
+                1.5,
+            ),
+
+            # Lift away only after the cube has had time
+            # to settle flat on the table.
 
             (
                 'B_LIFT',
                 self.pose_b_high,
-                3.0,
+                3.5,
                 1.0,
             ),
 
@@ -457,6 +477,79 @@ class AutoPickPlace(Node):
             f'Best error = '
             f'{best_error * 1000:.1f} mm'
         )
+
+    def rotate_pose_to_xy(
+        self,
+        source_pose,
+        target_x,
+        target_y,
+        name,
+    ):
+
+        # Current Cartesian position produced by the
+        # already-calibrated A-side posture.
+
+        source_xyz = (
+            forward_kinematics(
+                source_pose
+            )
+        )
+
+        source_heading = math.atan2(
+            source_xyz[1],
+            source_xyz[0],
+        )
+
+        target_heading = math.atan2(
+            target_y,
+            target_x,
+        )
+
+        result = list(
+            source_pose
+        )
+
+        # Rotate only the vertical base joint.
+        #
+        # J2 ... J6 remain unchanged, therefore the tool's
+        # roll / pitch and the cube's upright orientation
+        # are preserved.
+
+        result[0] += (
+            target_heading
+            -
+            source_heading
+        )
+
+        # MechArm J1 physical limit.
+        if not (
+            -2.792527
+            <= result[0]
+            <= 2.792527
+        ):
+
+            raise RuntimeError(
+                f'{name}: required J1 is outside limit.'
+            )
+
+        xyz = (
+            forward_kinematics(
+                result
+            )
+        )
+
+        xy_error = math.hypot(
+            xyz[0] - target_x,
+            xyz[1] - target_y,
+        )
+
+        self.get_logger().info(
+            f'{name}: orientation-preserving '
+            f'base rotation, '
+            f'XY error={xy_error * 1000:.1f} mm'
+        )
+
+        return result
 
     def print_solution(
         self,
