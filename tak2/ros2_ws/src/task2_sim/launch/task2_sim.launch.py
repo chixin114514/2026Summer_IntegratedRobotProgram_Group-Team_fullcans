@@ -176,11 +176,16 @@ def generate_launch_description():
         ],
     )
 
+    joint_controller_script = (
+        task2_share
+        / 'scripts'
+        / 'joint_controller.py'
+    )
+
     joint_controller = ExecuteProcess(
         cmd=[
             '/usr/bin/python3',
-            '-m',
-            'task2_sim.joint_controller',
+            str(joint_controller_script),
         ],
 
         output='screen',

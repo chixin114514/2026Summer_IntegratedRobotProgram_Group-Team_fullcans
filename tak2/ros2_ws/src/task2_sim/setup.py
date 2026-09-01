@@ -60,6 +60,13 @@ setup(
                 'urdf/*.urdf'
             ),
         ),
+
+        (
+            'share/' + package_name + '/scripts',
+            glob(
+                'task2_sim/*.py'
+            ),
+        ),
     ],
 
     install_requires=[
