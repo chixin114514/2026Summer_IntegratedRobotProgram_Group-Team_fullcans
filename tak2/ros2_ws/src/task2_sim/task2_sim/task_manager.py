@@ -359,6 +359,13 @@ class TaskManager(Node):
 
         self.state_started = False
 
+        # Small ROS synchronisation guard after STARTED.
+        #
+        # This gives safety_monitor time to reset its
+        # previous-command reference before a new trial sends
+        # the first joint command.
+        self.trial_start_not_before = 0.0
+
         # Current trajectory
         self.motion_active = False
 
@@ -507,15 +514,34 @@ class TaskManager(Node):
             ),
         ]
 
-        # 20 Hz:
+        # ====================================================
+        # Control update frequency
         #
-        # small incremental commands are required because
-        # safety_monitor rejects large instantaneous changes.
+        # Simulation runs at 50 Hz so faster trajectories are
+        # still divided into small, smooth joint increments.
+        #
+        # Real hardware remains at 20 Hz to avoid excessive
+        # serial / driver command traffic.
+        # ====================================================
+
+        if self.config.is_simulation:
+
+            self.control_period = 0.02
+
+        else:
+
+            self.control_period = 0.05
+
         self.timer = (
             self.create_timer(
-                0.05,
+                self.control_period,
                 self.update,
             )
+        )
+
+        self.get_logger().info(
+            'Task control frequency: '
+            f'{1.0 / self.control_period:.1f} Hz'
         )
 
         # ====================================================
@@ -1085,6 +1111,15 @@ class TaskManager(Node):
             'STARTED'
         )
 
+        # ROS topics are asynchronous.  Wait briefly so
+        # safety_monitor processes STARTED and clears the
+        # previous-trial command reference before motion.
+        self.trial_start_not_before = (
+            self.now_seconds()
+            +
+            0.20
+        )
+
     # ========================================================
     # Robot / safety feedback
     # ========================================================
@@ -1561,6 +1596,18 @@ class TaskManager(Node):
             self.task_finished
             or
             not self.task_running
+        ):
+
+            return
+
+        # -----------------------------------------------------
+        # Trial-boundary synchronisation.
+        # -----------------------------------------------------
+
+        if (
+            self.now_seconds()
+            <
+            self.trial_start_not_before
         ):
 
             return
