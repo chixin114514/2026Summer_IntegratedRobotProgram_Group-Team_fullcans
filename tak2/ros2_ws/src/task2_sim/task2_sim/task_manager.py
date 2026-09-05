@@ -124,32 +124,6 @@ class TaskManager(Node):
             )
         )
 
-        # -----------------------------------------------------
-        # IMPORTANT:
-        #
-        # /task2/robot_state can come from:
-        #
-        #   MEASURED
-        #       actual Gazebo / real robot feedback
-        #
-        #   COMMAND_FALLBACK
-        #       only a command estimate
-        #
-        # Startup homing must NEVER use COMMAND_FALLBACK as
-        # an actual robot posture.
-        # -----------------------------------------------------
-
-        self.robot_state_source_sub = (
-            self.create_subscription(
-                String,
-                common[
-                    'robot_state_source_topic'
-                ],
-                self.robot_state_source_callback,
-                10,
-            )
-        )
-
         self.safety_stop_sub = (
             self.create_subscription(
                 Bool,
@@ -324,13 +298,6 @@ class TaskManager(Node):
 
         self.current_joint_state = None
 
-        # State validity source:
-        #
-        # UNKNOWN
-        # MEASURED
-        # COMMAND_FALLBACK
-        self.robot_state_source = 'UNKNOWN'
-
         # The simulated robot is spawned in HOME.
         # Keep the internal command reference consistent with
         # that physical initial configuration.
@@ -358,13 +325,6 @@ class TaskManager(Node):
         self.state_index = -1
 
         self.state_started = False
-
-        # Small ROS synchronisation guard after STARTED.
-        #
-        # This gives safety_monitor time to reset its
-        # previous-command reference before a new trial sends
-        # the first joint command.
-        self.trial_start_not_before = 0.0
 
         # Current trajectory
         self.motion_active = False
@@ -486,9 +446,7 @@ class TaskManager(Node):
                 'motion',
                 self.b_place,
                 self.descend_duration,
-
-                # Wait at the original fixed B before release.
-                0.60,
+                0.25,
             ),
 
             (
@@ -496,13 +454,7 @@ class TaskManager(Node):
                 'gripper',
                 self.gripper_open,
                 0.0,
-
-                # Keep the wrist still while the physical
-                # fingers completely clear the cube.
-                max(
-                    self.gripper_open_duration,
-                    0.80,
-                ),
+                self.gripper_open_duration,
             ),
 
             (
@@ -522,79 +474,28 @@ class TaskManager(Node):
             ),
         ]
 
-        # ====================================================
-        # Control update frequency
+        # 20 Hz:
         #
-        # Simulation runs at 50 Hz so faster trajectories are
-        # still divided into small, smooth joint increments.
-        #
-        # Real hardware remains at 20 Hz to avoid excessive
-        # serial / driver command traffic.
-        # ====================================================
-
-        if self.config.is_simulation:
-
-            # 25 Hz is sufficient for smooth simulated motion
-            # while avoiding unnecessary CPU / bridge load.
-            #
-            # 50 Hz doubled the ROS -> Gazebo command traffic
-            # without making the total trajectory faster.
-            # Known-good simulation rate from the stable
-            # motion controller.
-            self.control_period = 0.05
-
-        else:
-
-            # Real robot remains at 20 Hz.
-            self.control_period = 0.05
-
+        # small incremental commands are required because
+        # safety_monitor rejects large instantaneous changes.
         self.timer = (
             self.create_timer(
-                self.control_period,
+                0.05,
                 self.update,
             )
         )
 
-        self.get_logger().info(
-            'Task control frequency: '
-            f'{1.0 / self.control_period:.1f} Hz'
-        )
-
-        # ====================================================
-        # Passive startup initialisation
-        #
-        # IMPORTANT:
-        #
-        # Gazebo JointPositionController already owns the
-        # initial HOME positioning through <initial_position>.
-        #
-        # task_manager MUST NOT generate another HOME
-        # trajectory at the same time.  Doing so creates two
-        # competing control references and causes the visible
-        # oscillation / twitching.
-        #
-        # We therefore ONLY observe measured joint state here.
-        # READY is emitted after HOME has remained stable for
-        # several consecutive samples.
-        # ====================================================
-
-        self.startup_complete = False
-
-        self.startup_stable_samples = 0
-
-        # 10 samples at the 20 Hz task loop = 0.5 s stable HOME.
-        self.startup_required_samples = 10
-
-        self.startup_home_tolerance = (
-            math.radians(5.0)
-        )
-
         self.ready_announce_count = 0
-        self.next_ready_announce_time = 0.0
 
-        self.get_logger().info(
-            'INITIALISING: waiting passively for '
-            'Gazebo controller to settle at HOME.'
+        self.ready_timer = (
+            self.create_timer(
+                0.50,
+                self.announce_ready,
+            )
+        )
+
+        self.publish_task_state(
+            'READY'
         )
 
         self.get_logger().info(
@@ -634,7 +535,7 @@ class TaskManager(Node):
 
     def announce_ready(self):
 
-        if not self.startup_complete:
+        if not self.initialisation_ok:
             return
 
         if self.task_running:
@@ -643,126 +544,17 @@ class TaskManager(Node):
         if self.safety_stopped:
             return
 
-        now = self.now_seconds()
+        if self.ready_announce_count >= 10:
 
-        if (
-            self.ready_announce_count
-            >=
-            6
-        ):
-            return
+            self.ready_timer.cancel()
 
-        if (
-            now
-            <
-            self.next_ready_announce_time
-        ):
             return
 
         self.ready_announce_count += 1
 
-        self.next_ready_announce_time = (
-            now
-            +
-            0.50
-        )
-
-        # READY is the handshake that allows
-        # experiment_manager to begin the acceptance trials.
         self.publish_task_state(
             'READY'
         )
-
-        self.get_logger().info(
-            'READY: task manager prepared for trial start.'
-        )
-
-
-    # ========================================================
-    # One-time smooth startup homing
-    # ========================================================
-
-    def update_startup(self):
-
-        if self.startup_complete:
-            return
-
-        # -----------------------------------------------------
-        # Do not publish ANY arm command during startup.
-        #
-        # The Gazebo JointPositionController already has the
-        # HOME target from <initial_position>.
-        # -----------------------------------------------------
-
-        if (
-            self.current_joint_state is None
-            or
-            self.robot_state_source != 'MEASURED'
-        ):
-
-            return
-
-        maximum_home_error = max(
-
-            abs(
-                self.current_joint_state[index]
-                -
-                self.home[index]
-            )
-
-            for index in range(
-                6
-            )
-        )
-
-        # -----------------------------------------------------
-        # HOME must remain inside the tolerance continuously.
-        # One transient pass is not sufficient.
-        # -----------------------------------------------------
-
-        if (
-            maximum_home_error
-            <=
-            self.startup_home_tolerance
-        ):
-
-            self.startup_stable_samples += 1
-
-        else:
-
-            self.startup_stable_samples = 0
-
-
-        if (
-            self.startup_stable_samples
-            <
-            self.startup_required_samples
-        ):
-
-            return
-
-        # -----------------------------------------------------
-        # Gazebo is physically settled.
-        #
-        # Synchronise only the SOFTWARE reference.
-        # Do NOT publish another joint command here.
-        # -----------------------------------------------------
-
-        self.commanded_pose = list(
-            self.home
-        )
-
-        self.startup_complete = True
-
-        self.next_ready_announce_time = 0.0
-
-        self.get_logger().info(
-            'INITIALISATION COMPLETE: '
-            'measured robot stable at HOME.'
-        )
-
-        self.announce_ready()
-
 
     # ========================================================
     # Time
@@ -796,31 +588,10 @@ class TaskManager(Node):
             self.kinematics.pick_seed()
         )
 
-        ik_configuration = (
-            self.config.task[
-                'kinematics'
-            ]
-        )
-
-        pick_place_tolerance = float(
-            ik_configuration[
-                'pick_place_position_tolerance_m'
-            ]
-        )
-
-        safe_waypoint_tolerance = float(
-            ik_configuration[
-                'safe_waypoint_position_tolerance_m'
-            ]
-        )
-
         self.a_pick = (
             self.kinematics.solve_position(
                 self.point_a,
                 pick_seed,
-                position_tolerance=(
-                    pick_place_tolerance
-                ),
             )
         )
 
@@ -863,7 +634,7 @@ class TaskManager(Node):
 
                 # Safe-height waypoint:
                 # exact millimetre positioning is not required.
-                position_tolerance=safe_waypoint_tolerance,
+                position_tolerance=0.012,
             )
         )
 
@@ -880,7 +651,7 @@ class TaskManager(Node):
                 # Transfer waypoint above B.
                 # A small XY deviation is acceptable here;
                 # final B_PLACE remains strictly constrained.
-                position_tolerance=safe_waypoint_tolerance,
+                position_tolerance=0.012,
             )
         )
 
@@ -895,9 +666,6 @@ class TaskManager(Node):
                 self.point_b,
                 transport_rotation,
                 self.b_safe,
-                position_tolerance=(
-                    pick_place_tolerance
-                ),
             )
         )
 
@@ -1028,28 +796,9 @@ class TaskManager(Node):
             'STARTED'
         )
 
-        # ROS topics are asynchronous.  Wait briefly so
-        # safety_monitor processes STARTED and clears the
-        # previous-trial command reference before motion.
-        self.trial_start_not_before = (
-            self.now_seconds()
-            +
-            0.20
-        )
-
     # ========================================================
     # Robot / safety feedback
     # ========================================================
-
-    def robot_state_source_callback(
-        self,
-        message,
-    ):
-
-        self.robot_state_source = (
-            message.data.strip()
-        )
-
 
     def robot_state_callback(
         self,
@@ -1488,43 +1237,12 @@ class TaskManager(Node):
 
     def update(self):
 
-        # -----------------------------------------------------
-        # Startup is a separate one-time trajectory.
-        #
-        # No normal pick-and-place state is allowed to execute
-        # until the robot has smoothly reached HOME.
-        # -----------------------------------------------------
-
-        if not self.startup_complete:
-
-            self.update_startup()
-
-            return
-
-        # Re-announce READY a few times after startup so the
-        # experiment manager cannot miss the handshake.
-        if not self.task_running:
-
-            self.announce_ready()
-
         if (
             self.task_stopped
             or
             self.task_finished
             or
             not self.task_running
-        ):
-
-            return
-
-        # -----------------------------------------------------
-        # Trial-boundary synchronisation.
-        # -----------------------------------------------------
-
-        if (
-            self.now_seconds()
-            <
-            self.trial_start_not_before
         ):
 
             return
