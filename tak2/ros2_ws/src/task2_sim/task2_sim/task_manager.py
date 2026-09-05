@@ -531,7 +531,9 @@ class TaskManager(Node):
             #
             # 50 Hz doubled the ROS -> Gazebo command traffic
             # without making the total trajectory faster.
-            self.control_period = 0.04
+            # Known-good simulation rate from the stable
+            # motion controller.
+            self.control_period = 0.05
 
         else:
 

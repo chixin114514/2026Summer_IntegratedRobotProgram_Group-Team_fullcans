@@ -20,8 +20,12 @@
         between consecutive arm commands, while substantially
         reducing Jetson CPU load.
       -->
+      <!--
+        Restored to the physics timestep used by the
+        previously stable arm controller.
+      -->
       <max_step_size>
-        0.002
+        0.001
       </max_step_size>
 
       <real_time_factor>
@@ -296,7 +300,7 @@
           <geometry>
             <cylinder>
               <radius>
-                0.045
+                0.050
               </radius>
 
               <length>
