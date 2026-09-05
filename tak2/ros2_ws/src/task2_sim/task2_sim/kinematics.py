@@ -1104,7 +1104,14 @@ class MechArmKinematics:
         self,
         target_xyz,
         seed,
+        position_tolerance=None,
     ):
+
+        if position_tolerance is None:
+
+            position_tolerance = (
+                self.position_tolerance
+            )
 
         if len(
             target_xyz
@@ -1159,7 +1166,7 @@ class MechArmKinematics:
             if (
                 error_norm
                 <=
-                self.position_tolerance
+                position_tolerance
             ):
 
                 self.validate_joints(

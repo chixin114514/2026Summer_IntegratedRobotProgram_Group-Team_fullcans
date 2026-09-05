@@ -189,52 +189,76 @@
 
   <joint name="joint1_to_base" type="revolute">
     <axis xyz="0 0 1"/>
-    <limit effort = "1000.0" lower = "-2.792527" upper = "2.792527" velocity="1.5"/>
+    <limit effort="20.0" lower = "-2.792527" upper = "2.792527" velocity="1.5"/>
     <parent link="base"/>
     <child link="link1"/>
     <origin xyz= "0 0 0.1" rpy = "0 0 0"/>  
+    <dynamics
+    damping="0.08"
+    friction="0.02"/>
+
   </joint>
 
 
   <joint name="joint2_to_joint1" type="revolute">
     <axis xyz="0 0 1"/>
-    <limit effort = "1000.0" lower = "-1.3089" upper = "2.0943" velocity="1.5"/>
+    <limit effort="25.0" lower = "-1.3089" upper = "2.0943" velocity="1.5"/>
     <parent link="link1"/>
     <child link="link2"/>
     <origin xyz= "0 0 0.038" rpy = " -1.5708 0 0 "/>  
+    <dynamics
+    damping="0.2"
+    friction="0.03"/>
+
   </joint>
 
 
   <joint name="joint3_to_joint2" type="revolute">
     <axis xyz=" 0 0 1"/>
-    <limit effort = "1000.0" lower = "-3.0543" upper = "1.1344" velocity="1.5"/>
+    <limit effort="22.0" lower = "-3.0543" upper = "1.1344" velocity="1.5"/>
     <parent link="link2"/>
     <child link="link3"/>
     <origin xyz= "0.0 -0.1 0   " rpy = "0 0 0 "/>  
+    <dynamics
+    damping="0.2"
+    friction="0.03"/>
+
   </joint>
 
   <joint name="joint4_to_joint3" type="revolute">
     <axis xyz=" 0 0 1"/>
-    <limit effort = "1000.0" lower = "-2.7052" upper = "2.7052" velocity="1.5"/>
+    <limit effort="12.0" lower = "-2.7052" upper = "2.7052" velocity="1.5"/>
     <parent link="link3"/>
     <child link="link4"/>
     <origin xyz= "0.108 -0.005  -0.001" rpy = "0 1.5708 0 "/>  
+    <dynamics
+    damping="0.12"
+    friction="0.02"/>
+
   </joint>
 
   <joint name="joint5_to_joint4" type="revolute">
     <axis xyz="0 0 1"/>
-    <limit effort = "1000.0" lower = "-2.0071" upper = "2.0071" velocity="1.5"/>
+    <limit effort="10.0" lower = "-2.0071" upper = "2.0071" velocity="1.5"/>
     <parent link="link4"/>
     <child link="link5"/>
     <origin xyz= " -0.001 0 0.0" rpy = "  0 -1.5708 0"/>  
+    <dynamics
+    damping="0.08"
+    friction="0.015"/>
+
   </joint>
 
   <joint name="joint6_to_joint5" type="revolute">
     <axis xyz="0 0 1"/>
-    <limit effort = "1000.0" lower = "-3.14" upper = "3.14" velocity="1.5"/>
+    <limit effort="8.0" lower = "-3.14" upper = "3.14" velocity="1.5"/>
     <parent link="link5"/>
     <child link="link6"/>
     <origin xyz= " 0.06 0.00 -0.0" rpy = "  0 1.5708 0 "/>  
+    <dynamics
+    damping="0.08"
+    friction="0.015"/>
+
   </joint>
   
 
@@ -248,9 +272,9 @@
 
       <initial_position>0.0</initial_position>
       <topic>/task2/joint1/cmd_pos</topic>
-      <p_gain>8.0</p_gain>
-      <i_gain>0.1</i_gain>
-      <d_gain>0.4</d_gain>
+      <p_gain>35.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>4.0</d_gain>
     </plugin>
 
     <plugin filename="ignition-gazebo-joint-position-controller-system"
@@ -259,9 +283,9 @@
 
       <initial_position>-0.349066</initial_position>
       <topic>/task2/joint2/cmd_pos</topic>
-      <p_gain>8.0</p_gain>
-      <i_gain>0.1</i_gain>
-      <d_gain>0.4</d_gain>
+      <p_gain>70.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>8.0</d_gain>
     </plugin>
 
     <plugin filename="ignition-gazebo-joint-position-controller-system"
@@ -270,9 +294,9 @@
 
       <initial_position>-1.22173</initial_position>
       <topic>/task2/joint3/cmd_pos</topic>
-      <p_gain>8.0</p_gain>
-      <i_gain>0.1</i_gain>
-      <d_gain>0.4</d_gain>
+      <p_gain>65.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>7.0</d_gain>
     </plugin>
 
     <plugin filename="ignition-gazebo-joint-position-controller-system"
@@ -281,9 +305,9 @@
 
       <initial_position>0.0</initial_position>
       <topic>/task2/joint4/cmd_pos</topic>
-      <p_gain>5.0</p_gain>
-      <i_gain>0.05</i_gain>
-      <d_gain>0.25</d_gain>
+      <p_gain>35.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>4.0</d_gain>
     </plugin>
 
     <plugin filename="ignition-gazebo-joint-position-controller-system"
@@ -292,9 +316,9 @@
 
       <initial_position>1.570796</initial_position>
       <topic>/task2/joint5/cmd_pos</topic>
-      <p_gain>5.0</p_gain>
-      <i_gain>0.05</i_gain>
-      <d_gain>0.25</d_gain>
+      <p_gain>30.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>3.5</d_gain>
     </plugin>
 
     <plugin filename="ignition-gazebo-joint-position-controller-system"
@@ -303,9 +327,9 @@
 
       <initial_position>0.0</initial_position>
       <topic>/task2/joint6/cmd_pos</topic>
-      <p_gain>4.0</p_gain>
-      <i_gain>0.05</i_gain>
-      <d_gain>0.20</d_gain>
+      <p_gain>25.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>3.0</d_gain>
     </plugin>
   </gazebo>
 
@@ -397,22 +421,22 @@
   <link name="left_finger">
 
     <visual>
-      <origin xyz="0 0 0.0275"/>
+      <origin xyz="0 0 0.024"/>
       <geometry>
-        <box size="0.008 0.014 0.055"/>
+        <box size="0.010 0.026 0.048"/>
       </geometry>
       <material name="gripper_dark"/>
     </visual>
 
     <collision>
-      <origin xyz="0 0 0.0275"/>
+      <origin xyz="0 0 0.024"/>
       <geometry>
-        <box size="0.008 0.014 0.055"/>
+        <box size="0.010 0.026 0.048"/>
       </geometry>
     </collision>
 
     <inertial>
-      <origin xyz="0 0 0.0275"/>
+      <origin xyz="0 0 0.024"/>
       <mass value="0.025"/>
       <inertia
         ixx="0.00002"
@@ -443,7 +467,7 @@
     <limit
       lower="0.0"
       upper="0.010"
-      effort="60"
+      effort="20"
       velocity="0.04"/>
 
     <dynamics
@@ -460,22 +484,22 @@
   <link name="right_finger">
 
     <visual>
-      <origin xyz="0 0 0.0275"/>
+      <origin xyz="0 0 0.024"/>
       <geometry>
-        <box size="0.008 0.014 0.055"/>
+        <box size="0.010 0.026 0.048"/>
       </geometry>
       <material name="gripper_dark"/>
     </visual>
 
     <collision>
-      <origin xyz="0 0 0.0275"/>
+      <origin xyz="0 0 0.024"/>
       <geometry>
-        <box size="0.008 0.014 0.055"/>
+        <box size="0.010 0.026 0.048"/>
       </geometry>
     </collision>
 
     <inertial>
-      <origin xyz="0 0 0.0275"/>
+      <origin xyz="0 0 0.024"/>
       <mass value="0.025"/>
       <inertia
         ixx="0.00002"
@@ -506,7 +530,7 @@
     <limit
       lower="0.0"
       upper="0.010"
-      effort="60"
+      effort="20"
       velocity="0.04"/>
 
     <dynamics
@@ -534,9 +558,9 @@
         /task2/gripper/left_cmd_pos
       </topic>
 
-      <p_gain>250.0</p_gain>
+      <p_gain>300.0</p_gain>
       <i_gain>0.0</i_gain>
-      <d_gain>8.0</d_gain>
+      <d_gain>15.0</d_gain>
 
       <initial_position>0.0</initial_position>
 
@@ -555,9 +579,9 @@
         /task2/gripper/right_cmd_pos
       </topic>
 
-      <p_gain>250.0</p_gain>
+      <p_gain>300.0</p_gain>
       <i_gain>0.0</i_gain>
-      <d_gain>8.0</d_gain>
+      <d_gain>15.0</d_gain>
 
       <initial_position>0.0</initial_position>
 
@@ -576,8 +600,8 @@
   <!-- High-friction rubber-like finger surfaces -->
 
   <gazebo reference="left_finger">
-    <mu1>4.0</mu1>
-    <mu2>4.0</mu2>
+    <mu1>1.5</mu1>
+    <mu2>1.5</mu2>
     <kp>1000000.0</kp>
     <kd>100.0</kd>
     <minDepth>0.001</minDepth>
@@ -585,8 +609,8 @@
   </gazebo>
 
   <gazebo reference="right_finger">
-    <mu1>4.0</mu1>
-    <mu2>4.0</mu2>
+    <mu1>1.5</mu1>
+    <mu2>1.5</mu2>
     <kp>1000000.0</kp>
     <kd>100.0</kd>
     <minDepth>0.001</minDepth>

@@ -446,7 +446,7 @@ class TaskManager(Node):
                 'motion',
                 self.b_place,
                 self.descend_duration,
-                0.25,
+                0.35,
             ),
 
             (
@@ -588,10 +588,31 @@ class TaskManager(Node):
             self.kinematics.pick_seed()
         )
 
+        ik_configuration = (
+            self.config.task[
+                'kinematics'
+            ]
+        )
+
+        pick_place_tolerance = float(
+            ik_configuration[
+                'pick_place_position_tolerance_m'
+            ]
+        )
+
+        safe_waypoint_tolerance = float(
+            ik_configuration[
+                'safe_waypoint_position_tolerance_m'
+            ]
+        )
+
         self.a_pick = (
             self.kinematics.solve_position(
                 self.point_a,
                 pick_seed,
+                position_tolerance=(
+                    pick_place_tolerance
+                ),
             )
         )
 
@@ -634,7 +655,7 @@ class TaskManager(Node):
 
                 # Safe-height waypoint:
                 # exact millimetre positioning is not required.
-                position_tolerance=0.012,
+                position_tolerance=safe_waypoint_tolerance,
             )
         )
 
@@ -651,7 +672,7 @@ class TaskManager(Node):
                 # Transfer waypoint above B.
                 # A small XY deviation is acceptable here;
                 # final B_PLACE remains strictly constrained.
-                position_tolerance=0.012,
+                position_tolerance=safe_waypoint_tolerance,
             )
         )
 
@@ -666,6 +687,9 @@ class TaskManager(Node):
                 self.point_b,
                 transport_rotation,
                 self.b_safe,
+                position_tolerance=(
+                    pick_place_tolerance
+                ),
             )
         )
 

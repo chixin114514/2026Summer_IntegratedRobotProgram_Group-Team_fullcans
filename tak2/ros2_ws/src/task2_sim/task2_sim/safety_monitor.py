@@ -210,6 +210,18 @@ class SafetyMonitor(Node):
             )
         )
 
+
+        self.task_state_sub = (
+            self.create_subscription(
+                String,
+                common[
+                    'task_state_topic'
+                ],
+                self.task_state_callback,
+                10,
+            )
+        )
+
         self.publish_state(
             'OK'
         )
@@ -337,6 +349,30 @@ class SafetyMonitor(Node):
         self.trigger_stop(
             reason
         )
+
+    # ========================================================
+    # Trial boundary synchronisation
+    #
+    # Reset ONLY the command-step reference. Joint limits,
+    # NaN checks and SAFE_STOP behaviour remain fully active.
+    # ========================================================
+
+    def task_state_callback(
+        self,
+        message,
+    ):
+
+        state = (
+            message.data.strip()
+        )
+
+        if state in (
+            'READY',
+            'STARTED',
+            'COMPLETED',
+        ):
+
+            self.previous_command = None
 
     # ========================================================
     # Joint command validation
