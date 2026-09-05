@@ -486,7 +486,9 @@ class TaskManager(Node):
                 'motion',
                 self.b_place,
                 self.descend_duration,
-                0.50,
+
+                # Wait at the original fixed B before release.
+                0.60,
             ),
 
             (
@@ -495,8 +497,8 @@ class TaskManager(Node):
                 self.gripper_open,
                 0.0,
 
-                # Keep the wrist fixed at B while both physical
-                # fingers fully retract and the block settles.
+                # Keep the wrist still while the physical
+                # fingers completely clear the cube.
                 max(
                     self.gripper_open_duration,
                     0.80,
@@ -545,68 +547,6 @@ class TaskManager(Node):
 
             # Real robot remains at 20 Hz.
             self.control_period = 0.05
-
-        # ====================================================
-        # Planner-side command-step limiter
-        #
-        # safety_monitor remains the final independent safety
-        # layer.  The trajectory generator itself deliberately
-        # stays below that threshold so normal timer jitter can
-        # never create a false JOINT_STEP_TOO_LARGE.
-        # ====================================================
-
-        safety_motion = (
-            self.config.safety[
-                'motion'
-            ]
-        )
-
-        if self.config.is_simulation:
-
-            safety_step_deg = float(
-                safety_motion[
-                    'maximum_joint_step_deg_simulation'
-                ]
-            )
-
-        else:
-
-            safety_step_deg = float(
-                safety_motion[
-                    'maximum_joint_step_deg_real'
-                ]
-            )
-
-        self.planner_max_joint_step = (
-            math.radians(
-                safety_step_deg
-                *
-                0.70
-            )
-        )
-
-        # Precision settling is required only at the two
-        # physically critical locations:
-        #
-        # A_PICK  -> before closing the fingers
-        # B_PLACE -> before opening the fingers
-        self.precision_settle_active = False
-        self.precision_settle_target = None
-        self.precision_settle_deadline = 0.0
-
-        if self.config.is_simulation:
-
-            self.precision_settle_tolerance = (
-                math.radians(1.0)
-            )
-
-        else:
-
-            self.precision_settle_tolerance = (
-                math.radians(1.5)
-            )
-
-        self.precision_settle_timeout = 2.5
 
         self.timer = (
             self.create_timer(
@@ -1503,7 +1443,7 @@ class TaskManager(Node):
             )
         )
 
-        desired_pose = [
+        pose = [
 
             self.motion_start_pose[index]
             +
@@ -1520,64 +1460,6 @@ class TaskManager(Node):
             )
         ]
 
-        # -----------------------------------------------------
-        # Bound each command step.
-        #
-        # This is intentionally done AFTER smoothstep.
-        #
-        # If the ROS timer executes late because Jetson is busy,
-        # desired_pose may jump farther than expected.  We scale
-        # the complete six-joint increment uniformly so the
-        # commanded path remains continuous and coordinated.
-        # -----------------------------------------------------
-
-        delta = [
-
-            desired_pose[index]
-            -
-            self.commanded_pose[index]
-
-            for index in range(
-                6
-            )
-        ]
-
-        maximum_delta = max(
-            abs(value)
-            for value in delta
-        )
-
-        if (
-            maximum_delta
-            >
-            self.planner_max_joint_step
-        ):
-
-            scale = (
-                self.planner_max_joint_step
-                /
-                maximum_delta
-            )
-
-            pose = [
-
-                self.commanded_pose[index]
-                +
-                delta[index]
-                *
-                scale
-
-                for index in range(
-                    6
-                )
-            ]
-
-        else:
-
-            pose = list(
-                desired_pose
-            )
-
         self.publish_joint_command(
             pose
         )
@@ -1586,77 +1468,21 @@ class TaskManager(Node):
             pose
         )
 
-        # -----------------------------------------------------
-        # Do NOT jump directly to the target when nominal time
-        # expires.
-        #
-        # If timer jitter caused the limiter to fall behind,
-        # keep taking safe incremental steps until the real
-        # commanded pose reaches the target.
-        # -----------------------------------------------------
+        if progress >= 1.0:
 
-        remaining = max(
-
-            abs(
-                self.motion_target_pose[index]
-                -
-                self.commanded_pose[index]
+            self.commanded_pose = list(
+                self.motion_target_pose
             )
 
-            for index in range(
-                6
+            self.publish_joint_command(
+                self.commanded_pose
             )
-        )
-
-        if (
-            progress >= 1.0
-            and
-            remaining < 1e-7
-        ):
 
             self.motion_active = False
 
             return True
 
         return False
-
-    # ========================================================
-    # Actual measured convergence
-    #
-    # A command reaching its mathematical target does not mean
-    # that a physical / simulated servo has already arrived.
-    #
-    # This distinction is especially important at B_PLACE:
-    # opening the fingers while the arm still lags behind B
-    # causes the block to be released short of the marker.
-    # ========================================================
-
-    def measured_target_error(
-        self,
-        target,
-    ):
-
-        if (
-            self.current_joint_state is None
-            or
-            self.robot_state_source != 'MEASURED'
-        ):
-
-            return None
-
-        return max(
-
-            abs(
-                self.current_joint_state[index]
-                -
-                target[index]
-            )
-
-            for index in range(
-                6
-            )
-        )
-
 
     # ========================================================
     # State machine
@@ -1811,7 +1637,7 @@ class TaskManager(Node):
         (
             name,
             state_type,
-            state_target,
+            _,
             _,
             hold_time,
         ) = self.sequence[
@@ -1832,65 +1658,6 @@ class TaskManager(Node):
 
                 if finished:
 
-                    if name in (
-                        'A_PICK',
-                        'B_PLACE',
-                    ):
-
-                        self.precision_settle_active = True
-
-                        self.precision_settle_target = list(
-                            state_target
-                        )
-
-                        self.precision_settle_deadline = (
-                            self.now_seconds()
-                            +
-                            self.precision_settle_timeout
-                        )
-
-                        self.get_logger().info(
-                            f'{name}: commanded target reached; '
-                            'waiting for measured joint convergence.'
-                        )
-
-                    else:
-
-                        self.hold_until = (
-                            self.now_seconds()
-                            +
-                            hold_time
-                        )
-
-                        self.get_logger().info(
-                            f'Reached: {name}'
-                        )
-
-                return
-
-            if self.precision_settle_active:
-
-                # Keep the final servo target active.
-                self.publish_joint_command(
-                    self.precision_settle_target
-                )
-
-                measured_error = (
-                    self.measured_target_error(
-                        self.precision_settle_target
-                    )
-                )
-
-                if (
-                    measured_error is not None
-                    and
-                    measured_error
-                    <=
-                    self.precision_settle_tolerance
-                ):
-
-                    self.precision_settle_active = False
-
                     self.hold_until = (
                         self.now_seconds()
                         +
@@ -1898,36 +1665,10 @@ class TaskManager(Node):
                     )
 
                     self.get_logger().info(
-                        f'Reached measured {name}: '
-                        f'max_joint_error='
-                        f'{math.degrees(measured_error):.2f} deg'
+                        f'Reached: {name}'
                     )
 
-                elif (
-                    self.now_seconds()
-                    >=
-                    self.precision_settle_deadline
-                ):
-
-                    error_deg = (
-                        -1.0
-                        if measured_error is None
-                        else
-                        math.degrees(
-                            measured_error
-                        )
-                    )
-
-                    self.fail_task(
-                        f'{name}: MOTION_SETTLE_TIMEOUT '
-                        f'max_joint_error_deg={error_deg:.2f}'
-                    )
-
-                    return
-
-                else:
-
-                    return
+                return
 
             if (
                 self.now_seconds()
