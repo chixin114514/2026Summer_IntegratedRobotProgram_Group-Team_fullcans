@@ -108,6 +108,16 @@ setup(
                 'task2_sim.gripper_interface:main'
             ),
 
+            (
+                'safety_monitor = '
+                'task2_sim.safety_monitor:main'
+            ),
+
+            (
+                'state_publisher = '
+                'task2_sim.state_publisher:main'
+            ),
+
         ],
     },
 )
