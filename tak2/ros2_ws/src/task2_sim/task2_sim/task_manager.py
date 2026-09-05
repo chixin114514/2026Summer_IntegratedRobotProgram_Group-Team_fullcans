@@ -587,6 +587,16 @@ class TaskManager(Node):
             0.50
         )
 
+        # READY is the handshake that allows
+        # experiment_manager to begin the acceptance trials.
+        self.publish_task_state(
+            'READY'
+        )
+
+        self.get_logger().info(
+            'READY: task manager prepared for trial start.'
+        )
+
 
     # ========================================================
     # One-time smooth startup homing
