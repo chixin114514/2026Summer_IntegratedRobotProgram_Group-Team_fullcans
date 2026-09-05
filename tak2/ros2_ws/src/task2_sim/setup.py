@@ -135,6 +135,17 @@ setup(
                 'task2_sim.task_logger:main'
             ),
 
+
+            (
+                'result_monitor = '
+                'task2_sim.result_monitor:main'
+            ),
+
+            (
+                'trial_reset_interface = '
+                'task2_sim.trial_reset_interface:main'
+            ),
+
         ],
     },
 )

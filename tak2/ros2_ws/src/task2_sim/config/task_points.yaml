@@ -132,3 +132,62 @@ kinematics:
 
     maximum_iteration_step_rad:
       0.08
+
+
+# ============================================================
+# Acceptance / result evaluation
+# ============================================================
+
+acceptance:
+
+  # Simulation waits briefly after the complete motion sequence
+  # before evaluating the final object pose.
+  settle_time_s:
+    1.0
+
+  # For a 50 mm square block inside a 45 mm-radius placement
+  # circle, approximately 9 mm centre tolerance keeps the
+  # complete block inside the designated region.
+  placement_xy_tolerance_m:
+    0.009
+
+  # Expected centre height of the 50 mm cube on the table.
+  simulation_object_center_z_m:
+    0.425
+
+  placement_z_tolerance_m:
+    0.008
+
+  # The block should be approximately upright / flat.
+  maximum_tilt_deg:
+    8.0
+
+  object_pose_timeout_s:
+    1.0
+
+
+# ============================================================
+# Simulation-only reset pose
+#
+# These values are WORLD coordinates used only to place the
+# simulated object back at A between acceptance trials.
+# They do not change task_manager.py.
+# ============================================================
+
+simulation_reset:
+
+  object_name:
+    target_object
+
+  world_name:
+    task2_world
+
+  point_a_world:
+
+    x: 0.180
+    y: 0.100
+    z: 0.425
+
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0

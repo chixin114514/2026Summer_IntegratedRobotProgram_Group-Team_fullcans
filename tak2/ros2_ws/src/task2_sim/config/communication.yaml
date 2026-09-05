@@ -54,6 +54,9 @@ common:
   operator_trial_result_topic:
     /task2/operator_trial_result
 
+  operator_reset_done_topic:
+    /task2/operator_reset_done
+
 
 simulation:
 
@@ -78,6 +81,10 @@ simulation:
 
   clock_topic:
     /clock
+
+  # Gazebo Pose_V will be bridged to tf2_msgs/TFMessage.
+  object_pose_topic:
+    /world/task2_world/pose/info
 
 
 real:
