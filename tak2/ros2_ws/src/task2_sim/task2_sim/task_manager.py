@@ -410,10 +410,23 @@ class TaskManager(Node):
             ),
 
             (
+                'A_PREGRASP',
+                'motion',
+                self.a_pregrasp,
+
+                # Move into the final wrist orientation while
+                # still safely above the cube.
+                0.80,
+                0.15,
+            ),
+
+            (
                 'A_PICK',
                 'motion',
                 self.a_pick,
-                self.descend_duration,
+
+                # Short final insertion.
+                0.70,
                 0.25,
             ),
 
@@ -588,16 +601,34 @@ class TaskManager(Node):
             self.kinematics.pick_seed()
         )
 
+        # -----------------------------------------------------
+        # A_PICK orientation
+        #
+        # The calibrated seed defines not only a useful XYZ
+        # starting point but also the intended physical gripper
+        # orientation.
+        #
+        # Position-only IK previously allowed J4/J5/J6 to rotate
+        # freely.  That could make the gripper support arms sweep
+        # sideways into the cube during the final approach.
+        # -----------------------------------------------------
+
+        calibrated_pick_rotation = (
+            self.kinematics.forward_rotation(
+                pick_seed
+            )
+        )
+
         self.a_pick = (
-            self.kinematics.solve_position(
+            self.kinematics.solve_pose(
                 self.point_a,
+                calibrated_pick_rotation,
                 pick_seed,
             )
         )
 
-        # Once the object is grasped, preserve this exact
-        # end-effector orientation for ALL transport motions.
-
+        # Preserve the same gripper orientation throughout
+        # pre-grasp, lift and transport.
         transport_rotation = (
             self.kinematics.forward_rotation(
                 self.a_pick
@@ -613,6 +644,21 @@ class TaskManager(Node):
             self.safe_height,
         ]
 
+        # Intermediate pre-grasp point.
+        #
+        # The wrist reaches its final grasp orientation here,
+        # while still well above the cube.  The final approach
+        # is therefore a short downward motion instead of a
+        # long joint-space sweep beside the object.
+        a_pregrasp_xyz = [
+
+            self.point_a[0],
+
+            self.point_a[1],
+
+            0.080,
+        ]
+
         b_safe_xyz = [
 
             self.point_b[0],
@@ -622,6 +668,15 @@ class TaskManager(Node):
             self.safe_height,
         ]
 
+        self.a_pregrasp = (
+            self.kinematics.solve_pose(
+                a_pregrasp_xyz,
+                transport_rotation,
+                self.a_pick,
+                position_tolerance=0.010,
+            )
+        )
+
         # -----------------------------------------------------
         # Lift from A while retaining gripper orientation
         # -----------------------------------------------------
@@ -630,7 +685,7 @@ class TaskManager(Node):
             self.kinematics.solve_pose(
                 a_safe_xyz,
                 transport_rotation,
-                self.a_pick,
+                self.a_pregrasp,
 
                 # Safe-height waypoint:
                 # exact millimetre positioning is not required.
@@ -688,6 +743,11 @@ class TaskManager(Node):
             (
                 'A_PICK',
                 self.a_pick,
+            ),
+
+            (
+                'A_PREGRASP',
+                self.a_pregrasp,
             ),
 
             (

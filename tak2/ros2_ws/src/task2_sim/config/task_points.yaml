@@ -7,15 +7,15 @@ home:
   - 90.0
   - 0.0
 point_a:
-  x: 0.176
-  y: 0.113
-  z:   0.038
+  x: 0.184
+  y: 0.118
+  z:    0.038
 point_b:
   x: 0.16
   y: -0.09
   z: 0.028
 safe_height:
-  z: 0.105
+  z: 0.110
 motion:
   simulation_speed_scale: 0.4
   real_speed_scale: 0.2
@@ -64,9 +64,9 @@ simulation_reset:
   object_name: target_object
   world_name: task2_world
   point_a_world:
-    x: 0.176
-    y: 0.113
-    z:   0.425
+    x: 0.184
+    y: 0.118
+    z:    0.425
     roll: 0.0
     pitch: 0.0
     yaw: 0.0
