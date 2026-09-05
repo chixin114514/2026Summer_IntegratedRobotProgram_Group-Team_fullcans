@@ -191,6 +191,60 @@ class TaskManager(Node):
             ),
         ]
 
+        # ====================================================
+        # A grasp calibration
+        #
+        # point_a is the fixed task / object position.
+        #
+        # grasp_offset_a compensates the real TCP position of
+        # the mechArm 270 Pi + myCobot Adaptive Gripper.
+        #
+        # This keeps the physical A point fixed while allowing
+        # millimetre-level gripper calibration.
+        # ====================================================
+
+        grasp_offset_a = (
+            task.get(
+                'grasp_offset_a',
+                {},
+            )
+        )
+
+        self.grasp_offset_a = [
+
+            float(
+                grasp_offset_a.get(
+                    'x',
+                    0.0,
+                )
+            ),
+
+            float(
+                grasp_offset_a.get(
+                    'y',
+                    0.0,
+                )
+            ),
+
+            float(
+                grasp_offset_a.get(
+                    'z',
+                    0.0,
+                )
+            ),
+        ]
+
+        self.a_grasp_target = [
+
+            self.point_a[index]
+            +
+            self.grasp_offset_a[index]
+
+            for index in range(
+                3
+            )
+        ]
+
         self.point_b = [
 
             float(
@@ -620,9 +674,23 @@ class TaskManager(Node):
             )
         )
 
+
+        self.get_logger().info(
+            'A calibration: '
+            f'fixed_A=('
+            f'{self.point_a[0]:.3f}, '
+            f'{self.point_a[1]:.3f}) '
+            f'grasp_target=('
+            f'{self.a_grasp_target[0]:.3f}, '
+            f'{self.a_grasp_target[1]:.3f}) '
+            f'offset=('
+            f'{self.grasp_offset_a[0] * 1000:.0f}, '
+            f'{self.grasp_offset_a[1] * 1000:.0f}) mm'
+        )
+
         self.a_pick = (
             self.kinematics.solve_pose(
-                self.point_a,
+                self.a_grasp_target,
                 calibrated_pick_rotation,
                 pick_seed,
             )
@@ -638,9 +706,9 @@ class TaskManager(Node):
 
         a_safe_xyz = [
 
-            self.point_a[0],
+            self.a_grasp_target[0],
 
-            self.point_a[1],
+            self.a_grasp_target[1],
 
             self.safe_height,
         ]
@@ -653,9 +721,9 @@ class TaskManager(Node):
         # long joint-space sweep beside the object.
         a_pregrasp_xyz = [
 
-            self.point_a[0],
+            self.a_grasp_target[0],
 
-            self.point_a[1],
+            self.a_grasp_target[1],
 
             0.095,
         ]

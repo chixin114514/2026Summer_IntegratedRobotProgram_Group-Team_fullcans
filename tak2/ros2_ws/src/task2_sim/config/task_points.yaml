@@ -10,6 +10,16 @@ point_a:
   x: 0.195
   y: 0.125
   z:     0.038
+grasp_offset_a:
+  # TCP compensation for mechArm 270 Pi +
+  # myCobot Adaptive Gripper.
+  #
+  # Positive X/Y moves the gripper farther
+  # outward towards the physical cube.
+  x: 0.013
+  y: 0.008
+  z: 0.000
+
 point_b:
   x: 0.16
   y: -0.09
