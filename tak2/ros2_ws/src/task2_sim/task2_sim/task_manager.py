@@ -575,6 +575,10 @@ class TaskManager(Node):
                 a_safe_xyz,
                 transport_rotation,
                 self.a_pick,
+
+                # Safe-height waypoint:
+                # exact millimetre positioning is not required.
+                position_tolerance=0.012,
             )
         )
 
@@ -587,6 +591,11 @@ class TaskManager(Node):
                 b_safe_xyz,
                 transport_rotation,
                 self.a_safe,
+
+                # Transfer waypoint above B.
+                # A small XY deviation is acceptable here;
+                # final B_PLACE remains strictly constrained.
+                position_tolerance=0.012,
             )
         )
 

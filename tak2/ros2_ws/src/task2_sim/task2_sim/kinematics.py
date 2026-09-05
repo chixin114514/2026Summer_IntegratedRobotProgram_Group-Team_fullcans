@@ -1241,7 +1241,21 @@ class MechArmKinematics:
         target_xyz,
         target_rotation,
         seed,
+        position_tolerance=None,
+        orientation_tolerance=None,
     ):
+
+        if position_tolerance is None:
+
+            position_tolerance = (
+                self.position_tolerance
+            )
+
+        if orientation_tolerance is None:
+
+            orientation_tolerance = (
+                self.orientation_tolerance
+            )
 
         joints = list(
             seed
@@ -1312,11 +1326,11 @@ class MechArmKinematics:
             if (
                 position_norm
                 <=
-                self.position_tolerance
+                position_tolerance
                 and
                 orientation_norm
                 <=
-                self.orientation_tolerance
+                orientation_tolerance
             ):
 
                 self.validate_joints(
