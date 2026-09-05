@@ -606,6 +606,17 @@ class ResultMonitor(Node):
                 'OBJECT_TILTED'
             )
 
+        self.get_logger().info(
+            'FINAL_OBJECT_POSE: '
+            f'x={x:.4f} '
+            f'y={y:.4f} '
+            f'z={z:.4f} '
+            f'dx_from_B={x - self.point_b_x:+.4f} '
+            f'dy_from_B={y - self.point_b_y:+.4f} '
+            f'xy_error={xy_error:.4f} '
+            f'tilt_deg={math.degrees(tilt):.2f}'
+        )
+
         self.publish_result(
             success,
             reason,

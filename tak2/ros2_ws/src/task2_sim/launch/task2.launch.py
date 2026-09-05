@@ -238,7 +238,13 @@ def generate_launch_description():
 
                 'ign',
                 'gazebo',
+
+                # Start the simulation server first.
+                # GUI is intentionally delayed until the
+                # initial physical scene has settled.
+                '-s',
                 '-r',
+
                 str(
                     world_file
                 ),
@@ -249,6 +255,39 @@ def generate_launch_description():
 
         actions.append(
             gazebo
+        )
+
+        # ----------------------------------------------------
+        # Delayed GUI
+        #
+        # By the time the GUI becomes visible:
+        #   - robot has spawned
+        #   - Task Manager has homed the arm
+        #   - startup object reset has completed
+        #
+        # This removes the ugly transient scene from the
+        # demonstration without changing simulation physics.
+        # ----------------------------------------------------
+
+        gazebo_gui = ExecuteProcess(
+
+            cmd=[
+                'ign',
+                'gazebo',
+                '-g',
+            ],
+
+            output='screen',
+        )
+
+        actions.append(
+
+            TimerAction(
+                period=8.2,
+                actions=[
+                    gazebo_gui
+                ],
+            )
         )
 
         # ----------------------------------------------------
@@ -492,7 +531,9 @@ def generate_launch_description():
     )
 
     experiment_delay = (
-        8.0
+        # Let the clean initialized scene become visible before
+        # Trial 1 begins.
+        9.2
         if simulation_mode
         else
         4.0

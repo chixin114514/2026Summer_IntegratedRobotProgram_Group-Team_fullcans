@@ -300,7 +300,7 @@
           <geometry>
             <cylinder>
               <radius>
-                0.050
+                0.045
               </radius>
 
               <length>
