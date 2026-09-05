@@ -135,6 +135,18 @@ class TaskManager(Node):
             )
         )
 
+
+        self.task_start_sub = (
+            self.create_subscription(
+                Bool,
+                common[
+                    'task_start_topic'
+                ],
+                self.task_start_callback,
+                10,
+            )
+        )
+
         # ====================================================
         # Explicit task parameters
         # ====================================================
@@ -298,6 +310,10 @@ class TaskManager(Node):
         self.task_stopped = False
 
         self.task_finished = False
+
+        # The node remains READY until experiment_manager sends
+        # /task2/task_start = true.
+        self.task_running = False
 
         self.state_index = -1
 
@@ -639,6 +655,58 @@ class TaskManager(Node):
             )
 
     # ========================================================
+    # Start one complete pick-and-place trial
+    # ========================================================
+
+    def task_start_callback(
+        self,
+        message,
+    ):
+
+        if not message.data:
+            return
+
+        if self.safety_stopped:
+
+            self.get_logger().error(
+                'Cannot start task: SAFE_STOP is active.'
+            )
+
+            return
+
+        if self.task_running:
+
+            self.get_logger().warn(
+                'Task start ignored: task already running.'
+            )
+
+            return
+
+        self.get_logger().info(
+            'New pick-and-place trial requested.'
+        )
+
+        self.task_stopped = False
+        self.task_finished = False
+        self.task_running = True
+
+        self.state_index = 0
+        self.state_started = False
+
+        self.motion_active = False
+
+        # Start every trial from the current reported posture.
+        if self.current_joint_state is not None:
+
+            self.commanded_pose = list(
+                self.current_joint_state
+            )
+
+        self.publish_task_state(
+            'STARTED'
+        )
+
+    # ========================================================
     # Robot / safety feedback
     # ========================================================
 
@@ -972,6 +1040,7 @@ class TaskManager(Node):
         ):
 
             self.task_finished = True
+            self.task_running = False
 
             self.publish_task_state(
                 'COMPLETED'
@@ -1063,20 +1132,9 @@ class TaskManager(Node):
             self.task_stopped
             or
             self.task_finished
+            or
+            not self.task_running
         ):
-
-            return
-
-        # -----------------------------------------------------
-        # Delay task start until the whole ROS graph has had
-        # time to initialise.
-        # -----------------------------------------------------
-
-        if self.state_index < 0:
-
-            self.state_index = 0
-
-            self.state_started = False
 
             return
 

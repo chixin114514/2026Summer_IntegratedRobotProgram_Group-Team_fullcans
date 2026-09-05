@@ -124,6 +124,17 @@ setup(
                 'task2_sim.task_manager:main'
             ),
 
+
+            (
+                'experiment_manager = '
+                'task2_sim.experiment_manager:main'
+            ),
+
+            (
+                'task_logger = '
+                'task2_sim.task_logger:main'
+            ),
+
         ],
     },
 )
