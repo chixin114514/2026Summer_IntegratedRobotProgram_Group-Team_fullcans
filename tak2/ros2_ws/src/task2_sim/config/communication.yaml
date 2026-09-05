@@ -1,0 +1,71 @@
+# ============================================================
+# Task 2 communication configuration
+#
+# Upper-level task logic uses the common /task2 interfaces.
+# The backend maps them either to Gazebo or to the real robot.
+# ============================================================
+
+common:
+
+  arm_command_topic:
+    /task2/arm/joint_command
+
+  gripper_command_topic:
+    /task2/gripper/command
+
+  robot_state_topic:
+    /task2/robot_state
+
+  task_state_topic:
+    /task2/task_state
+
+  safety_state_topic:
+    /task2/safety_state
+
+
+simulation:
+
+  joint_command_topics:
+
+    - /task2/joint1/cmd_pos
+    - /task2/joint2/cmd_pos
+    - /task2/joint3/cmd_pos
+    - /task2/joint4/cmd_pos
+    - /task2/joint5/cmd_pos
+    - /task2/joint6/cmd_pos
+
+  gripper_left_topic:
+    /task2/gripper/left_cmd_pos
+
+  gripper_right_topic:
+    /task2/gripper/right_cmd_pos
+
+  clock_topic:
+    /clock
+
+
+real:
+
+  # These are intentionally isolated here.
+  #
+  # When the real MechArm driver is confirmed on the Jetson,
+  # only these communication parameters / adapter are changed.
+  # task_manager.py remains identical.
+
+  driver_type:
+    ros2
+
+  joint_command_topic:
+    /mecharm270/joint_command
+
+  joint_state_topic:
+    /joint_states
+
+  gripper_command_topic:
+    /mecharm270/gripper_command
+
+  emergency_stop_topic:
+    /mecharm270/emergency_stop
+
+  connection_state_topic:
+    /mecharm270/connection_state

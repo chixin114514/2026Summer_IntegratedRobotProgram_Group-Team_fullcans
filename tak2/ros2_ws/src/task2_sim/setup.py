@@ -92,10 +92,22 @@ setup(
 
     entry_points={
         'console_scripts': [
+
             (
                 'joint_controller = '
                 'task2_sim.joint_controller:main'
             ),
+
+            (
+                'arm_interface = '
+                'task2_sim.arm_interface:main'
+            ),
+
+            (
+                'gripper_interface = '
+                'task2_sim.gripper_interface:main'
+            ),
+
         ],
     },
 )

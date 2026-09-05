@@ -1,0 +1,64 @@
+# ============================================================
+# Task 2 device configuration
+#
+# mode:
+#   0 = Gazebo simulation
+#   1 = real MechArm 270
+#
+# IMPORTANT:
+# The task logic must NOT be changed when switching modes.
+# Only device / communication / position parameters change.
+# ============================================================
+
+mode: 0
+
+robot:
+
+  name: mecharm_270
+
+  dof: 6
+
+  base_frame: base
+
+  tool_frame: gripper_palm
+
+
+gripper:
+
+  type: parallel_two_finger
+
+  enabled: true
+
+
+simulation:
+
+  enabled_when_mode: 0
+
+  world_name: task2_world
+
+  robot_entity_name: mecharm_270
+
+  target_entity_name: target_object
+
+
+real:
+
+  enabled_when_mode: 1
+
+  robot_model: mecharm_270
+
+  # The exact device may change on the Jetson.
+  # Typical examples:
+  #
+  # /dev/ttyUSB0
+  # /dev/ttyACM0
+  #
+  # Change this parameter only; task logic remains unchanged.
+
+  serial_device: /dev/ttyUSB0
+
+  baudrate: 115200
+
+  timeout_s: 1.0
+
+  low_speed_mode: true

@@ -1,0 +1,71 @@
+# ============================================================
+# Task 2 safety configuration
+# ============================================================
+
+joint_limits_deg:
+
+  joint1:
+    min: -160.0
+    max: 160.0
+
+  joint2:
+    min: -75.0
+    max: 120.0
+
+  joint3:
+    min: -175.0
+    max: 65.0
+
+  joint4:
+    min: -155.0
+    max: 155.0
+
+  joint5:
+    min: -115.0
+    max: 115.0
+
+  joint6:
+    min: -180.0
+    max: 180.0
+
+
+cartesian:
+
+  minimum_table_clearance_m:
+    0.015
+
+  maximum_position_error_m:
+    0.015
+
+  ik_position_tolerance_m:
+    0.005
+
+  ik_orientation_tolerance_deg:
+    3.0
+
+
+motion:
+
+  maximum_joint_step_deg:
+    5.0
+
+  real_low_speed_required:
+    true
+
+
+failure_policy:
+
+  unreachable_target:
+    safe_stop
+
+  ik_failure:
+    safe_stop
+
+  joint_limit:
+    safe_stop
+
+  communication_failure:
+    safe_stop
+
+  grasp_failure:
+    return_home

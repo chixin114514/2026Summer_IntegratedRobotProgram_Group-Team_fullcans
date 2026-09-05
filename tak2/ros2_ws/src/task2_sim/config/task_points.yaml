@@ -1,26 +1,86 @@
-task2_pick_place:
+# ============================================================
+# Fixed-point pick-and-place task configuration
+#
+# Coordinates are expressed relative to the robot base frame.
+# ============================================================
 
-  ros__parameters:
+home:
 
-    # Coordinates are expressed relative to the robot base frame.
-    # Unit: metre.
+  joints_deg:
+    - 0.0
+    - -20.0
+    - -70.0
+    - 0.0
+    - 90.0
+    - 0.0
 
-    pickup:
-      x: 0.18
-      y: 0.10
-      z: 0.05
 
-    place:
-      x: 0.18
-      y: -0.10
-      z: 0.05
+point_a:
 
-    # Height used when travelling between task points.
-    safe_height: 0.15
+  x: 0.180
 
-    # Initial conservative motion settings.
-    velocity_scale: 0.20
-    acceleration_scale: 0.20
+  y: 0.100
 
-    # Number of required consecutive experiment runs.
-    repeat_count: 5
+  z: 0.040
+
+
+point_b:
+
+  x: 0.180
+
+  y: -0.100
+
+  z: 0.040
+
+
+safe_height:
+
+  z: 0.110
+
+
+motion:
+
+  simulation_speed_scale:
+    0.40
+
+  real_speed_scale:
+    0.20
+
+  home_duration_s:
+    4.0
+
+  approach_duration_s:
+    4.0
+
+  descend_duration_s:
+    3.0
+
+  lift_duration_s:
+    3.5
+
+  transfer_duration_s:
+    5.0
+
+
+gripper:
+
+  open_position:
+    0.000
+
+  closed_position:
+    0.008
+
+  close_duration_s:
+    1.5
+
+  open_duration_s:
+    1.5
+
+
+experiment:
+
+  total_trials:
+    5
+
+  required_successes:
+    4
