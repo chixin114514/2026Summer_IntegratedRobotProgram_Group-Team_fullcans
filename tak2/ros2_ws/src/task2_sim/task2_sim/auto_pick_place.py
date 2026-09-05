@@ -12,7 +12,10 @@ from std_msgs.msg import (
 from joint_tuner import (
     HOME,
     forward_kinematics,
+    forward_transform,
+    rotation_from_transform,
     solve_ik,
+    solve_pose_ik,
 )
 
 
@@ -165,47 +168,66 @@ class AutoPickPlace(Node):
             )
         )
 
+        # -----------------------------------------------------
+        # Preserve the exact wrist orientation used at A_PICK.
+        #
+        # Position-only IK was allowing J4/J5/J6 to rotate
+        # freely during lift and transfer. Because the cube is
+        # rigidly attached to the gripper during transport,
+        # that wrist rotation directly tilted the cube.
+        #
+        # From this point onwards every transport waypoint
+        # keeps the same end-effector orientation.
+        # -----------------------------------------------------
+
+        pick_transform = (
+            forward_transform(
+                self.pose_a_pick
+            )
+        )
+
+        self.transport_rotation = (
+            rotation_from_transform(
+                pick_transform
+            )
+        )
+
         self.pose_a_high = (
-            self.find_pose(
+            self.find_pose_with_orientation(
                 [
                     PICK_X,
                     PICK_Y,
                     SAFE_Z,
                 ],
+                self.transport_rotation,
                 self.pose_a_pick,
                 'A_APPROACH',
             )
         )
 
-        # -----------------------------------------------------
-        # B is geometrically symmetric with A.
-        #
-        # Do NOT solve B with an independent six-joint IK.
-        # A different IK branch can change wrist roll / pitch,
-        # causing the grasped cube to arrive at B tilted.
-        #
-        # Instead:
-        #   - preserve J2 ... J6 exactly;
-        #   - rotate only J1 around the vertical base axis.
-        #
-        # This preserves the cube's upright orientation.
-        # -----------------------------------------------------
-
-        self.pose_b_pick = (
-            self.rotate_pose_to_xy(
-                self.pose_a_pick,
-                PLACE_X,
-                PLACE_Y,
-                'B_PLACE',
+        self.pose_b_high = (
+            self.find_pose_with_orientation(
+                [
+                    PLACE_X,
+                    PLACE_Y,
+                    SAFE_Z,
+                ],
+                self.transport_rotation,
+                self.pose_a_high,
+                'B_APPROACH',
             )
         )
 
-        self.pose_b_high = (
-            self.rotate_pose_to_xy(
-                self.pose_a_high,
-                PLACE_X,
-                PLACE_Y,
-                'B_APPROACH',
+        self.pose_b_pick = (
+            self.find_pose_with_orientation(
+                [
+                    PLACE_X,
+                    PLACE_Y,
+                    PICK_Z,
+                ],
+                self.transport_rotation,
+                self.pose_b_high,
+                'B_PLACE',
             )
         )
 
@@ -476,6 +498,47 @@ class AutoPickPlace(Node):
             f'No safe IK solution for {name}. '
             f'Best error = '
             f'{best_error * 1000:.1f} mm'
+        )
+
+    def find_pose_with_orientation(
+        self,
+        xyz,
+        rotation,
+        seed,
+        name,
+    ):
+
+        success, pose, position_error, orientation_error = (
+            solve_pose_ik(
+                xyz,
+                rotation,
+                seed,
+            )
+        )
+
+        self.get_logger().info(
+            f'{name}: full-pose IK '
+            f'position_error='
+            f'{position_error * 1000:.1f} mm, '
+            f'orientation_error='
+            f'{math.degrees(orientation_error):.2f} deg'
+        )
+
+        if (
+            position_error > 0.012
+            or
+            orientation_error
+            >
+            math.radians(4.0)
+        ):
+
+            raise RuntimeError(
+                f'{name}: no acceptable '
+                f'position + orientation solution.'
+            )
+
+        return list(
+            pose
         )
 
     def rotate_pose_to_xy(

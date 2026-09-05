@@ -1578,3 +1578,510 @@ def main(args=None):
 if __name__ == '__main__':
 
     main()
+
+
+# ============================================================
+# Full end-effector pose helpers
+# ============================================================
+
+def forward_transform(q):
+
+    t = identity4()
+
+    for index in range(6):
+
+        xyz, rpy = JOINTS[index]
+
+        t = mat_mul(
+            t,
+            origin_matrix(
+                xyz,
+                rpy,
+            ),
+        )
+
+        t = mat_mul(
+            t,
+            rot_z(
+                q[index]
+            ),
+        )
+
+    t = mat_mul(
+        t,
+        translation(
+            0.0,
+            0.0,
+            0.045,
+        ),
+    )
+
+    return t
+
+
+def rotation_from_transform(t):
+
+    return [
+        [
+            t[r][c]
+            for c in range(3)
+        ]
+        for r in range(3)
+    ]
+
+
+def transpose3(a):
+
+    return [
+        [
+            a[c][r]
+            for c in range(3)
+        ]
+        for r in range(3)
+    ]
+
+
+def mat3_mul(a, b):
+
+    return [
+        [
+            sum(
+                a[r][k] * b[k][c]
+                for k in range(3)
+            )
+            for c in range(3)
+        ]
+        for r in range(3)
+    ]
+
+
+def orientation_error(
+    current_r,
+    target_r,
+):
+
+    # Rotation error matrix:
+    #
+    # R_error = R_target * R_current^T
+
+    r_err = mat3_mul(
+        target_r,
+        transpose3(
+            current_r
+        ),
+    )
+
+    # Small-angle orientation error vector.
+    #
+    # For the small corrections used during numerical IK this
+    # gives a stable rotation-vector approximation.
+
+    return [
+        0.5
+        *
+        (
+            r_err[2][1]
+            -
+            r_err[1][2]
+        ),
+
+        0.5
+        *
+        (
+            r_err[0][2]
+            -
+            r_err[2][0]
+        ),
+
+        0.5
+        *
+        (
+            r_err[1][0]
+            -
+            r_err[0][1]
+        ),
+    ]
+
+
+def solve_linear_system(
+    matrix,
+    vector,
+):
+
+    n = len(vector)
+
+    a = [
+        [
+            float(matrix[r][c])
+            for c in range(n)
+        ]
+        +
+        [
+            float(vector[r])
+        ]
+        for r in range(n)
+    ]
+
+    for col in range(n):
+
+        pivot = max(
+            range(
+                col,
+                n,
+            ),
+            key=lambda r: abs(
+                a[r][col]
+            ),
+        )
+
+        if abs(
+            a[pivot][col]
+        ) < 1e-10:
+
+            return None
+
+        a[col], a[pivot] = (
+            a[pivot],
+            a[col],
+        )
+
+        divisor = a[col][col]
+
+        for c in range(
+            col,
+            n + 1,
+        ):
+
+            a[col][c] /= divisor
+
+        for r in range(n):
+
+            if r == col:
+                continue
+
+            factor = a[r][col]
+
+            for c in range(
+                col,
+                n + 1,
+            ):
+
+                a[r][c] -= (
+                    factor
+                    *
+                    a[col][c]
+                )
+
+    return [
+        a[i][n]
+        for i in range(n)
+    ]
+
+
+def solve_pose_ik(
+    target_xyz,
+    target_rotation,
+    seed,
+):
+
+    q = list(seed)
+
+    epsilon = 0.001
+
+    position_weight = 1.0
+    orientation_weight = 0.35
+
+    damping = 0.03
+
+    for _ in range(400):
+
+        current_t = (
+            forward_transform(
+                q
+            )
+        )
+
+        current_xyz = [
+            current_t[0][3],
+            current_t[1][3],
+            current_t[2][3],
+        ]
+
+        current_rotation = (
+            rotation_from_transform(
+                current_t
+            )
+        )
+
+        pos_error = [
+            target_xyz[i]
+            -
+            current_xyz[i]
+            for i in range(3)
+        ]
+
+        rot_error = (
+            orientation_error(
+                current_rotation,
+                target_rotation,
+            )
+        )
+
+        position_norm = math.sqrt(
+            sum(
+                e * e
+                for e in pos_error
+            )
+        )
+
+        orientation_norm = math.sqrt(
+            sum(
+                e * e
+                for e in rot_error
+            )
+        )
+
+        if (
+            position_norm < 0.003
+            and
+            orientation_norm < 0.025
+        ):
+
+            return (
+                True,
+                q,
+                position_norm,
+                orientation_norm,
+            )
+
+        error = [
+
+            pos_error[0]
+            * position_weight,
+
+            pos_error[1]
+            * position_weight,
+
+            pos_error[2]
+            * position_weight,
+
+            rot_error[0]
+            * orientation_weight,
+
+            rot_error[1]
+            * orientation_weight,
+
+            rot_error[2]
+            * orientation_weight,
+        ]
+
+        # 6 x 6 numerical Jacobian
+        j = [
+            [
+                0.0
+                for _ in range(6)
+            ]
+            for _ in range(6)
+        ]
+
+        for joint in range(6):
+
+            q_test = list(q)
+
+            q_test[joint] = (
+                clamp_joint(
+                    q_test[joint]
+                    +
+                    epsilon,
+                    joint,
+                )
+            )
+
+            actual_delta = (
+                q_test[joint]
+                -
+                q[joint]
+            )
+
+            if abs(
+                actual_delta
+            ) < 1e-10:
+
+                continue
+
+            test_t = (
+                forward_transform(
+                    q_test
+                )
+            )
+
+            test_xyz = [
+                test_t[0][3],
+                test_t[1][3],
+                test_t[2][3],
+            ]
+
+            test_rotation = (
+                rotation_from_transform(
+                    test_t
+                )
+            )
+
+            delta_orientation = (
+                orientation_error(
+                    current_rotation,
+                    test_rotation,
+                )
+            )
+
+            for row in range(3):
+
+                j[row][joint] = (
+                    (
+                        test_xyz[row]
+                        -
+                        current_xyz[row]
+                    )
+                    /
+                    actual_delta
+                    *
+                    position_weight
+                )
+
+                j[row + 3][joint] = (
+                    delta_orientation[row]
+                    /
+                    actual_delta
+                    *
+                    orientation_weight
+                )
+
+        # Damped least squares:
+        #
+        # dq = J^T (J J^T + λ²I)^-1 e
+
+        a = [
+            [
+                0.0
+                for _ in range(6)
+            ]
+            for _ in range(6)
+        ]
+
+        for r in range(6):
+
+            for c in range(6):
+
+                a[r][c] = sum(
+                    j[r][k]
+                    *
+                    j[c][k]
+                    for k in range(6)
+                )
+
+                if r == c:
+
+                    a[r][c] += (
+                        damping
+                        *
+                        damping
+                    )
+
+        y = solve_linear_system(
+            a,
+            error,
+        )
+
+        if y is None:
+
+            break
+
+        dq = [
+            sum(
+                j[row][joint]
+                *
+                y[row]
+                for row in range(6)
+            )
+            for joint in range(6)
+        ]
+
+        max_step = max(
+            abs(v)
+            for v in dq
+        )
+
+        if max_step > 0.08:
+
+            scale = (
+                0.08
+                /
+                max_step
+            )
+
+            dq = [
+                v * scale
+                for v in dq
+            ]
+
+        for joint in range(6):
+
+            q[joint] = (
+                clamp_joint(
+                    q[joint]
+                    +
+                    dq[joint],
+                    joint,
+                )
+            )
+
+    final_t = (
+        forward_transform(
+            q
+        )
+    )
+
+    final_xyz = [
+        final_t[0][3],
+        final_t[1][3],
+        final_t[2][3],
+    ]
+
+    final_rotation = (
+        rotation_from_transform(
+            final_t
+        )
+    )
+
+    final_pos_error = math.sqrt(
+        sum(
+            (
+                target_xyz[i]
+                -
+                final_xyz[i]
+            )
+            ** 2
+            for i in range(3)
+        )
+    )
+
+    final_rot_vec = (
+        orientation_error(
+            final_rotation,
+            target_rotation,
+        )
+    )
+
+    final_rot_error = math.sqrt(
+        sum(
+            v * v
+            for v in final_rot_vec
+        )
+    )
+
+    return (
+        False,
+        q,
+        final_pos_error,
+        final_rot_error,
+    )
