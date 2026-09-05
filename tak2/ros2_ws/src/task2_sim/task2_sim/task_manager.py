@@ -514,7 +514,10 @@ class TaskManager(Node):
                 'motion',
                 self.b_place,
                 self.descend_duration,
-                0.25,
+
+                # Hold the complete grasped object still at the
+                # compensated B position before releasing.
+                0.60,
             ),
 
             (
@@ -522,7 +525,13 @@ class TaskManager(Node):
                 'gripper',
                 self.gripper_open,
                 0.0,
-                self.gripper_open_duration,
+
+                # Let both physical fingers fully clear the
+                # object while the wrist remains stationary.
+                max(
+                    self.gripper_open_duration,
+                    0.80,
+                ),
             ),
 
             (
@@ -728,11 +737,34 @@ class TaskManager(Node):
             0.095,
         ]
 
+        # =====================================================
+        # B placement compensation
+        #
+        # point_b is the FIXED desired object position.
+        #
+        # b_release_target is the robot TCP position required
+        # to put the grasped object centre onto point_b.
+        #
+        # The same rigid grasp offset measured at A is retained
+        # because transport_rotation is kept constant.
+        # =====================================================
+
+        self.b_release_target = [
+
+            self.point_b[index]
+            +
+            self.grasp_offset_a[index]
+
+            for index in range(
+                3
+            )
+        ]
+
         b_safe_xyz = [
 
-            self.point_b[0],
+            self.b_release_target[0],
 
-            self.point_b[1],
+            self.b_release_target[1],
 
             self.safe_height,
         ]
@@ -787,10 +819,24 @@ class TaskManager(Node):
 
         self.b_place = (
             self.kinematics.solve_pose(
-                self.point_b,
+                self.b_release_target,
                 transport_rotation,
                 self.b_safe,
             )
+        )
+
+
+        self.get_logger().info(
+            'B placement calibration: '
+            f'fixed_B=('
+            f'{self.point_b[0]:.3f}, '
+            f'{self.point_b[1]:.3f}) '
+            f'release_TCP=('
+            f'{self.b_release_target[0]:.3f}, '
+            f'{self.b_release_target[1]:.3f}) '
+            f'grasp_offset=('
+            f'{self.grasp_offset_a[0] * 1000:.0f}, '
+            f'{self.grasp_offset_a[1] * 1000:.0f}) mm'
         )
 
         # -----------------------------------------------------
