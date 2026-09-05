@@ -281,11 +281,40 @@ class ExperimentManager(Node):
                 self.manager_ready = True
 
                 self.get_logger().info(
-                    'Task manager READY. '
-                    'Starting acceptance trials.'
+                    'Task manager READY.'
                 )
 
-                self.start_next_trial()
+                # -------------------------------------------------
+                # Trial 1 also requires a clean scene.
+                #
+                # Do exactly the same reset used between later
+                # trials:
+                #
+                # simulation:
+                #   target_object -> A
+                #
+                # real robot:
+                #   operator prepares the object at A
+                #
+                # Only after reset_done may Trial 1 start.
+                # -------------------------------------------------
+
+                self.waiting_for_reset = True
+
+                reset = Bool()
+                reset.data = True
+
+                self.reset_request_pub.publish(
+                    reset
+                )
+
+                self.publish_state(
+                    'INITIAL_SCENE_RESET'
+                )
+
+                self.get_logger().info(
+                    'Preparing initial object at point A.'
+                )
 
             return
 

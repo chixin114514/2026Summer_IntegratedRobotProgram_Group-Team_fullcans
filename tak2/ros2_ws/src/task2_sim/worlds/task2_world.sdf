@@ -172,8 +172,7 @@
     <model name="target_object">
 
       <pose>
-        0.16 0.09 0.425 0 0 0
-      </pose>
+        0.16 0.09 0.425 0 0 0</pose>
 
       <link name="object_link">
 
@@ -276,8 +275,7 @@
       </static>
 
       <pose>
-        0.16 -0.09 0.402 0 0 0
-      </pose>
+        0.16 -0.09 0.402 0 0 0</pose>
 
       <link name="marker_link">
 

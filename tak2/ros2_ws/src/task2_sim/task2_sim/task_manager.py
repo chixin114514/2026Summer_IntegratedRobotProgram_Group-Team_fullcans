@@ -487,6 +487,28 @@ class TaskManager(Node):
 
         self.ready_announce_count = 0
 
+        # -----------------------------------------------------
+        # Startup initialisation
+        #
+        # Gazebo joint controller <initial_position> alone does
+        # not guarantee that the robot is already physically at
+        # HOME before the complete ROS control chain is ready.
+        #
+        # Therefore task_manager actively commands HOME and an
+        # open gripper before it is allowed to announce READY.
+        # -----------------------------------------------------
+
+        self.startup_home_until = (
+            self.now_seconds()
+            +
+            2.5
+        )
+
+        self.get_logger().info(
+            'INITIALISING: moving robot to HOME '
+            'and opening gripper.'
+        )
+
         self.ready_timer = (
             self.create_timer(
                 0.50,
@@ -543,6 +565,53 @@ class TaskManager(Node):
 
         if self.safety_stopped:
             return
+
+        # -----------------------------------------------------
+        # BEFORE READY:
+        #
+        # continuously command HOME so that both the simulation
+        # and the internal command reference agree.
+        # -----------------------------------------------------
+
+        if (
+            self.now_seconds()
+            <
+            self.startup_home_until
+        ):
+
+            self.publish_joint_command(
+                self.home
+            )
+
+            self.commanded_pose = list(
+                self.home
+            )
+
+            self.publish_gripper_command(
+                self.gripper_open
+            )
+
+            return
+
+        if self.ready_announce_count == 0:
+
+            # One final HOME command immediately before READY.
+            self.publish_joint_command(
+                self.home
+            )
+
+            self.commanded_pose = list(
+                self.home
+            )
+
+            self.publish_gripper_command(
+                self.gripper_open
+            )
+
+            self.get_logger().info(
+                'INITIALISATION: robot HOME reached, '
+                'gripper OPEN.'
+            )
 
         if self.ready_announce_count >= 10:
 
