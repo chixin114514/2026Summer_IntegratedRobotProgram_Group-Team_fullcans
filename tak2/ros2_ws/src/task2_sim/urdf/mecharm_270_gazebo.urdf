@@ -272,9 +272,9 @@
 
       <initial_position>0.0</initial_position>
       <topic>/task2/joint1/cmd_pos</topic>
-      <p_gain>35.0</p_gain>
+      <p_gain>8.0</p_gain>
       <i_gain>0.0</i_gain>
-      <d_gain>4.0</d_gain>
+      <d_gain>1.5</d_gain>
     </plugin>
 
     <plugin filename="ignition-gazebo-joint-position-controller-system"
@@ -283,9 +283,9 @@
 
       <initial_position>-0.349066</initial_position>
       <topic>/task2/joint2/cmd_pos</topic>
-      <p_gain>70.0</p_gain>
+      <p_gain>12.0</p_gain>
       <i_gain>0.0</i_gain>
-      <d_gain>8.0</d_gain>
+      <d_gain>2.5</d_gain>
     </plugin>
 
     <plugin filename="ignition-gazebo-joint-position-controller-system"
@@ -294,9 +294,9 @@
 
       <initial_position>-1.22173</initial_position>
       <topic>/task2/joint3/cmd_pos</topic>
-      <p_gain>65.0</p_gain>
+      <p_gain>12.0</p_gain>
       <i_gain>0.0</i_gain>
-      <d_gain>7.0</d_gain>
+      <d_gain>2.5</d_gain>
     </plugin>
 
     <plugin filename="ignition-gazebo-joint-position-controller-system"
@@ -305,9 +305,9 @@
 
       <initial_position>0.0</initial_position>
       <topic>/task2/joint4/cmd_pos</topic>
-      <p_gain>35.0</p_gain>
+      <p_gain>8.0</p_gain>
       <i_gain>0.0</i_gain>
-      <d_gain>4.0</d_gain>
+      <d_gain>1.5</d_gain>
     </plugin>
 
     <plugin filename="ignition-gazebo-joint-position-controller-system"
@@ -316,9 +316,9 @@
 
       <initial_position>1.570796</initial_position>
       <topic>/task2/joint5/cmd_pos</topic>
-      <p_gain>30.0</p_gain>
+      <p_gain>6.0</p_gain>
       <i_gain>0.0</i_gain>
-      <d_gain>3.5</d_gain>
+      <d_gain>1.0</d_gain>
     </plugin>
 
     <plugin filename="ignition-gazebo-joint-position-controller-system"
@@ -327,9 +327,9 @@
 
       <initial_position>0.0</initial_position>
       <topic>/task2/joint6/cmd_pos</topic>
-      <p_gain>25.0</p_gain>
+      <p_gain>5.0</p_gain>
       <i_gain>0.0</i_gain>
-      <d_gain>3.0</d_gain>
+      <d_gain>0.8</d_gain>
     </plugin>
   </gazebo>
 

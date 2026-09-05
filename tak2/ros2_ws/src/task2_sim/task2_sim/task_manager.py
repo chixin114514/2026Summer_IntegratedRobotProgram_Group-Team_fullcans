@@ -485,39 +485,36 @@ class TaskManager(Node):
             )
         )
 
+        # ====================================================
+        # Smooth startup initialisation
+        #
+        # IMPORTANT:
+        # Never repeatedly issue an instantaneous HOME target.
+        #
+        # Startup is handled once by the normal cubic trajectory
+        # generator:
+        #
+        # measured/current pose
+        #          ->
+        #      smooth HOME
+        #          ->
+        #       settle
+        #          ->
+        #        READY
+        # ====================================================
+
+        self.startup_complete = False
+        self.startup_motion_started = False
+        self.startup_motion_finished = False
+
+        self.startup_hold_until = 0.0
+
         self.ready_announce_count = 0
-
-        # -----------------------------------------------------
-        # Startup initialisation
-        #
-        # Gazebo joint controller <initial_position> alone does
-        # not guarantee that the robot is already physically at
-        # HOME before the complete ROS control chain is ready.
-        #
-        # Therefore task_manager actively commands HOME and an
-        # open gripper before it is allowed to announce READY.
-        # -----------------------------------------------------
-
-        self.startup_home_until = (
-            self.now_seconds()
-            +
-            2.5
-        )
+        self.next_ready_announce_time = 0.0
 
         self.get_logger().info(
-            'INITIALISING: moving robot to HOME '
-            'and opening gripper.'
-        )
-
-        self.ready_timer = (
-            self.create_timer(
-                0.50,
-                self.announce_ready,
-            )
-        )
-
-        self.publish_task_state(
-            'READY'
+            'INITIALISING: waiting for robot state '
+            'before smooth HOME motion.'
         )
 
         self.get_logger().info(
@@ -557,7 +554,7 @@ class TaskManager(Node):
 
     def announce_ready(self):
 
-        if not self.initialisation_ok:
+        if not self.startup_complete:
             return
 
         if self.task_running:
@@ -566,64 +563,150 @@ class TaskManager(Node):
         if self.safety_stopped:
             return
 
-        # -----------------------------------------------------
-        # BEFORE READY:
-        #
-        # continuously command HOME so that both the simulation
-        # and the internal command reference agree.
-        # -----------------------------------------------------
+        now = self.now_seconds()
 
         if (
-            self.now_seconds()
-            <
-            self.startup_home_until
+            self.ready_announce_count
+            >=
+            6
         ):
-
-            self.publish_joint_command(
-                self.home
-            )
-
-            self.commanded_pose = list(
-                self.home
-            )
-
-            self.publish_gripper_command(
-                self.gripper_open
-            )
-
             return
 
-        if self.ready_announce_count == 0:
-
-            # One final HOME command immediately before READY.
-            self.publish_joint_command(
-                self.home
-            )
-
-            self.commanded_pose = list(
-                self.home
-            )
-
-            self.publish_gripper_command(
-                self.gripper_open
-            )
-
-            self.get_logger().info(
-                'INITIALISATION: robot HOME reached, '
-                'gripper OPEN.'
-            )
-
-        if self.ready_announce_count >= 10:
-
-            self.ready_timer.cancel()
-
+        if (
+            now
+            <
+            self.next_ready_announce_time
+        ):
             return
 
         self.ready_announce_count += 1
 
-        self.publish_task_state(
-            'READY'
+        self.next_ready_announce_time = (
+            now
+            +
+            0.50
         )
+
+
+    # ========================================================
+    # One-time smooth startup homing
+    # ========================================================
+
+    def update_startup(self):
+
+        if self.startup_complete:
+            return
+
+        # -----------------------------------------------------
+        # First wait until a robot state exists.
+        #
+        # We initialise the commanded reference from that state
+        # so HOME is reached by interpolation rather than by a
+        # discontinuous position step.
+        # -----------------------------------------------------
+
+        if not self.startup_motion_started:
+
+            if self.current_joint_state is None:
+                return
+
+            self.commanded_pose = list(
+                self.current_joint_state
+            )
+
+            self.motion_start_pose = list(
+                self.current_joint_state
+            )
+
+            self.publish_gripper_command(
+                self.gripper_open
+            )
+
+            self.start_motion(
+                self.home,
+
+                # Deliberately slower than normal HOME only for
+                # the initial settling movement.
+                max(
+                    1.8,
+                    self.home_duration,
+                ),
+            )
+
+            self.startup_motion_started = True
+
+            self.get_logger().info(
+                'INITIALISING: smooth motion to HOME.'
+            )
+
+            return
+
+
+        # -----------------------------------------------------
+        # Execute the SAME smoothstep trajectory used by the
+        # normal task.
+        # -----------------------------------------------------
+
+        if self.motion_active:
+
+            finished = (
+                self.update_motion()
+            )
+
+            if finished:
+
+                self.startup_motion_finished = True
+
+                self.startup_hold_until = (
+                    self.now_seconds()
+                    +
+                    0.60
+                )
+
+                self.get_logger().info(
+                    'INITIALISING: HOME motion complete; '
+                    'settling.'
+                )
+
+            return
+
+
+        if not self.startup_motion_finished:
+            return
+
+
+        if (
+            self.now_seconds()
+            <
+            self.startup_hold_until
+        ):
+            return
+
+
+        # -----------------------------------------------------
+        # HOME is now stable.
+        # READY may finally be announced.
+        # -----------------------------------------------------
+
+        self.commanded_pose = list(
+            self.home
+        )
+
+        self.publish_gripper_command(
+            self.gripper_open
+        )
+
+        self.startup_complete = True
+
+        self.next_ready_announce_time = 0.0
+
+        self.get_logger().info(
+            'INITIALISATION COMPLETE: '
+            'robot HOME, gripper OPEN.'
+        )
+
+        self.announce_ready()
+
 
     # ========================================================
     # Time
@@ -1329,6 +1412,25 @@ class TaskManager(Node):
         self.state_started = False
 
     def update(self):
+
+        # -----------------------------------------------------
+        # Startup is a separate one-time trajectory.
+        #
+        # No normal pick-and-place state is allowed to execute
+        # until the robot has smoothly reached HOME.
+        # -----------------------------------------------------
+
+        if not self.startup_complete:
+
+            self.update_startup()
+
+            return
+
+        # Re-announce READY a few times after startup so the
+        # experiment manager cannot miss the handshake.
+        if not self.task_running:
+
+            self.announce_ready()
 
         if (
             self.task_stopped
