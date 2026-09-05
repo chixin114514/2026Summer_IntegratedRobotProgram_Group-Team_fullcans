@@ -149,15 +149,11 @@ class ExperimentManager(Node):
             )
         )
 
-        # Give all ROS nodes time to initialise.
-        self.start_timer = (
-            self.create_timer(
-                3.0,
-                self.initial_start,
-            )
-        )
-
-        self.initial_start_done = False
+        # Do NOT start on a fixed timer.
+        #
+        # The experiment may start only after task_manager has
+        # finished IK / limit validation and publishes READY.
+        self.manager_ready = False
 
         self.get_logger().info(
             'Experiment manager started.'
@@ -206,17 +202,6 @@ class ExperimentManager(Node):
         self.experiment_state_pub.publish(
             message
         )
-
-    def initial_start(self):
-
-        if self.initial_start_done:
-            return
-
-        self.initial_start_done = True
-
-        self.start_timer.cancel()
-
-        self.start_next_trial()
 
     # ========================================================
     # Trial control
@@ -280,6 +265,30 @@ class ExperimentManager(Node):
             message.data.strip()
         )
 
+        if state == 'READY':
+
+            # First READY starts the acceptance experiment.
+            #
+            # Repeated READY announcements are intentionally
+            # ignored after the experiment has started.
+
+            if (
+                not self.manager_ready
+                and
+                not self.finished
+            ):
+
+                self.manager_ready = True
+
+                self.get_logger().info(
+                    'Task manager READY. '
+                    'Starting acceptance trials.'
+                )
+
+                self.start_next_trial()
+
+            return
+
         if state == 'COMPLETED':
 
             if self.waiting_for_result:
@@ -302,6 +311,28 @@ class ExperimentManager(Node):
                 'ERROR:'
             )
         ):
+
+            # If Trial 1 never started, this is a system
+            # initialisation error rather than a grasp failure.
+
+            if self.current_trial == 0:
+
+                self.finished = True
+
+                self.get_logger().error(
+                    'Experiment cannot start: '
+                    + state
+                )
+
+                self.publish_state(
+                    'INITIALISATION_FAILED',
+                    {
+                        'reason':
+                            state,
+                    },
+                )
+
+                return
 
             if self.waiting_for_result:
                 return

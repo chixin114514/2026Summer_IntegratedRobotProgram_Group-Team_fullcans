@@ -307,6 +307,13 @@ class TaskManager(Node):
 
         self.safety_stopped = False
 
+        # True only after ALL task waypoints have been
+        # successfully calculated and validated.
+        #
+        # A task-start command received before this point
+        # must never move the robot.
+        self.initialisation_ok = False
+
         self.task_stopped = False
 
         self.task_finished = False
@@ -367,6 +374,10 @@ class TaskManager(Node):
             )
 
             return
+
+        # All required Cartesian targets now have valid
+        # joint-space solutions.
+        self.initialisation_ok = True
 
         # ====================================================
         # State machine
@@ -474,6 +485,15 @@ class TaskManager(Node):
             )
         )
 
+        self.ready_announce_count = 0
+
+        self.ready_timer = (
+            self.create_timer(
+                0.50,
+                self.announce_ready,
+            )
+        )
+
         self.publish_task_state(
             'READY'
         )
@@ -498,6 +518,42 @@ class TaskManager(Node):
 
         self.get_logger().info(
             '========================================'
+        )
+
+    # ========================================================
+    # READY handshake
+    #
+    # READY means:
+    #   - configuration loaded
+    #   - A/B reachable
+    #   - IK solved
+    #   - joint limits validated
+    #
+    # experiment_manager is forbidden from starting before it
+    # receives this state.
+    # ========================================================
+
+    def announce_ready(self):
+
+        if not self.initialisation_ok:
+            return
+
+        if self.task_running:
+            return
+
+        if self.safety_stopped:
+            return
+
+        if self.ready_announce_count >= 10:
+
+            self.ready_timer.cancel()
+
+            return
+
+        self.ready_announce_count += 1
+
+        self.publish_task_state(
+            'READY'
         )
 
     # ========================================================
@@ -673,6 +729,15 @@ class TaskManager(Node):
     ):
 
         if not message.data:
+            return
+
+        if not self.initialisation_ok:
+
+            self.get_logger().error(
+                'Task start rejected: '
+                'kinematics initialisation is not complete.'
+            )
+
             return
 
         if self.safety_stopped:

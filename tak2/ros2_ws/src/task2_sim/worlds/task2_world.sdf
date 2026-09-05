@@ -276,7 +276,7 @@
       </static>
 
       <pose>
-        0.18 -0.10 0.402 0 0 0
+        0.16 -0.09 0.402 0 0 0
       </pose>
 
       <link name="marker_link">
