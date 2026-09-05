@@ -1,121 +1,39 @@
-# ============================================================
-# Task 2 communication configuration
-#
-# The task logic always uses the COMMON interfaces below.
-# Device-specific topics are isolated in simulation / real.
-# ============================================================
-
 common:
-
-  # task_manager publishes here.
-  requested_arm_command_topic:
-    /task2/arm/requested_joint_command
-
-  # safety_monitor publishes validated commands here.
-  arm_command_topic:
-    /task2/arm/joint_command
-
-  gripper_command_topic:
-    /task2/gripper/command
-
-  robot_state_topic:
-    /task2/robot_state
-
-  robot_state_source_topic:
-    /task2/robot_state_source
-
-  task_state_topic:
-    /task2/task_state
-
-  safety_state_topic:
-    /task2/safety_state
-
-  safety_stop_topic:
-    /task2/safety_stop
-
-  safety_reset_topic:
-    /task2/safety_reset
-
-  task_fault_topic:
-    /task2/task_fault
-
-  task_start_topic:
-    /task2/task_start
-
-  trial_result_topic:
-    /task2/trial_result
-
-  trial_reset_request_topic:
-    /task2/trial_reset_request
-
-  trial_reset_done_topic:
-    /task2/trial_reset_done
-
-  operator_trial_result_topic:
-    /task2/operator_trial_result
-
-  operator_reset_done_topic:
-    /task2/operator_reset_done
-
-
+  requested_arm_command_topic: /task2/arm/requested_joint_command
+  arm_command_topic: /task2/arm/joint_command
+  gripper_command_topic: /task2/gripper/command
+  robot_state_topic: /task2/robot_state
+  robot_state_source_topic: /task2/robot_state_source
+  task_state_topic: /task2/task_state
+  safety_state_topic: /task2/safety_state
+  safety_stop_topic: /task2/safety_stop
+  safety_reset_topic: /task2/safety_reset
+  task_fault_topic: /task2/task_fault
+  task_start_topic: /task2/task_start
+  trial_result_topic: /task2/trial_result
+  trial_reset_request_topic: /task2/trial_reset_request
+  trial_reset_done_topic: /task2/trial_reset_done
+  operator_trial_result_topic: /task2/operator_trial_result
+  operator_reset_done_topic: /task2/operator_reset_done
 simulation:
-
   joint_command_topics:
-
-    - /task2/joint1/cmd_pos
-    - /task2/joint2/cmd_pos
-    - /task2/joint3/cmd_pos
-    - /task2/joint4/cmd_pos
-    - /task2/joint5/cmd_pos
-    - /task2/joint6/cmd_pos
-
-  # Later the Gazebo joint-state bridge will publish here.
-  joint_state_topic:
-    /joint_states
-
-  gripper_left_topic:
-    /task2/gripper/left_cmd_pos
-
-  gripper_right_topic:
-    /task2/gripper/right_cmd_pos
-
-  clock_topic:
-    /clock
-
-  # Gazebo Pose_V will be bridged to tf2_msgs/TFMessage.
-  object_pose_topic:
-    /world/task2_world/pose/info
-
-
+  - /task2/joint1/cmd_pos
+  - /task2/joint2/cmd_pos
+  - /task2/joint3/cmd_pos
+  - /task2/joint4/cmd_pos
+  - /task2/joint5/cmd_pos
+  - /task2/joint6/cmd_pos
+  joint_state_topic: /task2/gazebo/joint_state
+  gripper_left_topic: /task2/gripper/left_cmd_pos
+  gripper_right_topic: /task2/gripper/right_cmd_pos
+  clock_topic: /clock
+  object_pose_topic: /world/task2_world/pose/info
 real:
-
-  # ==========================================================
-  # REAL ROBOT COMMUNICATION
-  #
-  # These parameters may be modified on demonstration day
-  # without changing task_manager.py.
-  # ==========================================================
-
-  driver_type:
-    ros2
-
-  serial_device:
-    /dev/ttyUSB0
-
-  baudrate:
-    115200
-
-  joint_command_topic:
-    /mecharm270/joint_command
-
-  joint_state_topic:
-    /joint_states
-
-  gripper_command_topic:
-    /mecharm270/gripper_command
-
-  emergency_stop_topic:
-    /mecharm270/emergency_stop
-
-  connection_state_topic:
-    /mecharm270/connection_state
+  driver_type: ros2
+  serial_device: /dev/ttyUSB0
+  baudrate: 115200
+  joint_command_topic: /mecharm270/joint_command
+  joint_state_topic: /joint_states
+  gripper_command_topic: /mecharm270/gripper_command
+  emergency_stop_topic: /mecharm270/emergency_stop
+  connection_state_topic: /mecharm270/connection_state

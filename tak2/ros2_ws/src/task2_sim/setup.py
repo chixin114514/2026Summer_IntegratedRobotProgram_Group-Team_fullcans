@@ -146,6 +146,12 @@ setup(
                 'task2_sim.trial_reset_interface:main'
             ),
 
+
+            (
+                'real_robot_driver = '
+                'task2_sim.real_robot_driver:main'
+            ),
+
         ],
     },
 )

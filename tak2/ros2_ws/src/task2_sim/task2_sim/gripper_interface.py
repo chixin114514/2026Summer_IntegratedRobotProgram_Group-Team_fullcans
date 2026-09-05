@@ -1,8 +1,16 @@
 import rclpy
 
+from ament_index_python.packages import (
+    get_package_share_directory,
+)
+
 from rclpy.node import Node
 
 from std_msgs.msg import Float64
+
+from task2_sim.runtime_config import (
+    Task2Config,
+)
 
 
 class GripperInterface(Node):
@@ -13,94 +21,100 @@ class GripperInterface(Node):
             'task2_gripper_interface'
         )
 
-        self.declare_parameter(
-            'mode',
-            0,
-        )
-
-        self.declare_parameter(
-            'simulation_left_topic',
-            '/task2/gripper/left_cmd_pos',
-        )
-
-        self.declare_parameter(
-            'simulation_right_topic',
-            '/task2/gripper/right_cmd_pos',
-        )
-
-        self.declare_parameter(
-            'real_gripper_topic',
-            '/mecharm270/gripper_command',
-        )
-
-        self.mode = int(
-            self.get_parameter(
-                'mode'
-            ).value
-        )
-
-        if self.mode not in (
-            0,
-            1,
-        ):
-
-            raise RuntimeError(
-                'GripperInterface mode must be 0 or 1.'
+        config_dir = (
+            get_package_share_directory(
+                'task2_sim'
             )
+            + '/config'
+        )
 
-        self.command_subscriber = (
+        self.config = Task2Config(
+            config_dir
+        )
+
+        common = (
+            self.config.communication[
+                'common'
+            ]
+        )
+
+        self.command_sub = (
             self.create_subscription(
                 Float64,
-                '/task2/gripper/command',
+                common[
+                    'gripper_command_topic'
+                ],
                 self.command_callback,
                 10,
             )
         )
 
-        self.left_publisher = None
-        self.right_publisher = None
-        self.real_publisher = None
+        self.left_pub = None
+        self.right_pub = None
+        self.real_pub = None
 
-        if self.mode == 0:
+        # -----------------------------------------------------
+        # Simulation physical fingers
+        # -----------------------------------------------------
 
-            self.left_publisher = (
+        if self.config.is_simulation:
+
+            simulation = (
+                self.config.communication[
+                    'simulation'
+                ]
+            )
+
+            self.left_pub = (
                 self.create_publisher(
                     Float64,
-                    self.get_parameter(
-                        'simulation_left_topic'
-                    ).value,
+                    simulation[
+                        'gripper_left_topic'
+                    ],
                     10,
                 )
             )
 
-            self.right_publisher = (
+            self.right_pub = (
                 self.create_publisher(
                     Float64,
-                    self.get_parameter(
-                        'simulation_right_topic'
-                    ).value,
+                    simulation[
+                        'gripper_right_topic'
+                    ],
                     10,
                 )
             )
 
             self.get_logger().info(
-                'Gripper interface mode: SIMULATION'
+                'GRIPPER BACKEND = '
+                'GAZEBO PHYSICAL FINGERS'
             )
+
+        # -----------------------------------------------------
+        # Real gripper adapter
+        # -----------------------------------------------------
 
         else:
 
-            self.real_publisher = (
+            real = (
+                self.config.communication[
+                    'real'
+                ]
+            )
+
+            self.real_pub = (
                 self.create_publisher(
                     Float64,
-                    self.get_parameter(
-                        'real_gripper_topic'
-                    ).value,
+                    real[
+                        'gripper_command_topic'
+                    ],
                     10,
                 )
             )
 
             self.get_logger().info(
-                'Gripper interface mode: REAL ROBOT'
+                'GRIPPER BACKEND = '
+                'REAL MECHARM GRIPPER'
             )
 
     def command_callback(
@@ -108,33 +122,33 @@ class GripperInterface(Node):
         message,
     ):
 
-        command = float(
+        value = float(
             message.data
         )
 
-        if self.mode == 0:
+        if self.config.is_simulation:
 
-            left_message = Float64()
-            right_message = Float64()
+            left = Float64()
+            right = Float64()
 
-            left_message.data = command
-            right_message.data = command
+            left.data = value
+            right.data = value
 
-            self.left_publisher.publish(
-                left_message
+            self.left_pub.publish(
+                left
             )
 
-            self.right_publisher.publish(
-                right_message
+            self.right_pub.publish(
+                right
             )
 
         else:
 
             output = Float64()
 
-            output.data = command
+            output.data = value
 
-            self.real_publisher.publish(
+            self.real_pub.publish(
                 output
             )
 

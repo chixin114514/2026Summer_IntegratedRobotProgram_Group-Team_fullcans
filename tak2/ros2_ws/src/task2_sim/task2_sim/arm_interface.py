@@ -2,10 +2,20 @@ import math
 
 import rclpy
 
+from ament_index_python.packages import (
+    get_package_share_directory,
+)
+
 from rclpy.node import Node
 
-from std_msgs.msg import Float64
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import (
+    Float64,
+    Float64MultiArray,
+)
+
+from task2_sim.runtime_config import (
+    Task2Config,
+)
 
 
 class ArmInterface(Node):
@@ -16,47 +26,35 @@ class ArmInterface(Node):
             'task2_arm_interface'
         )
 
-        self.declare_parameter(
-            'mode',
-            0,
-        )
-
-        self.declare_parameter(
-            'simulation_joint_topics',
-            [
-                '/task2/joint1/cmd_pos',
-                '/task2/joint2/cmd_pos',
-                '/task2/joint3/cmd_pos',
-                '/task2/joint4/cmd_pos',
-                '/task2/joint5/cmd_pos',
-                '/task2/joint6/cmd_pos',
-            ],
-        )
-
-        self.declare_parameter(
-            'real_joint_command_topic',
-            '/mecharm270/joint_command',
-        )
-
-        self.mode = int(
-            self.get_parameter(
-                'mode'
-            ).value
-        )
-
-        if self.mode not in (
-            0,
-            1,
-        ):
-
-            raise RuntimeError(
-                'ArmInterface mode must be 0 or 1.'
+        config_dir = (
+            get_package_share_directory(
+                'task2_sim'
             )
+            + '/config'
+        )
 
-        self.command_subscriber = (
+        self.config = Task2Config(
+            config_dir
+        )
+
+        common = (
+            self.config.communication[
+                'common'
+            ]
+        )
+
+        self.mode = self.config.mode
+
+        # -----------------------------------------------------
+        # Unified upper-level command
+        # -----------------------------------------------------
+
+        self.command_sub = (
             self.create_subscription(
                 Float64MultiArray,
-                '/task2/arm/joint_command',
+                common[
+                    'arm_command_topic'
+                ],
                 self.command_callback,
                 10,
             )
@@ -66,18 +64,25 @@ class ArmInterface(Node):
 
         self.real_publisher = None
 
-        if self.mode == 0:
+        # -----------------------------------------------------
+        # MODE 0: Gazebo
+        # -----------------------------------------------------
 
-            topics = list(
-                self.get_parameter(
-                    'simulation_joint_topics'
-                ).value
+        if self.config.is_simulation:
+
+            topics = (
+                self.config.communication[
+                    'simulation'
+                ][
+                    'joint_command_topics'
+                ]
             )
 
             if len(topics) != 6:
 
                 raise RuntimeError(
-                    'Simulation requires six joint topics.'
+                    'Simulation configuration must '
+                    'contain six joint command topics.'
                 )
 
             for topic in topics:
@@ -85,33 +90,39 @@ class ArmInterface(Node):
                 self.sim_publishers.append(
                     self.create_publisher(
                         Float64,
-                        topic,
+                        str(topic),
                         10,
                     )
                 )
 
             self.get_logger().info(
-                'Arm interface mode: SIMULATION'
+                'ARM BACKEND = GAZEBO'
             )
+
+        # -----------------------------------------------------
+        # MODE 1: real MechArm adapter
+        # -----------------------------------------------------
 
         else:
 
             real_topic = (
-                self.get_parameter(
-                    'real_joint_command_topic'
-                ).value
+                self.config.communication[
+                    'real'
+                ][
+                    'joint_command_topic'
+                ]
             )
 
             self.real_publisher = (
                 self.create_publisher(
                     Float64MultiArray,
-                    real_topic,
+                    str(real_topic),
                     10,
                 )
             )
 
             self.get_logger().info(
-                'Arm interface mode: REAL ROBOT'
+                'ARM BACKEND = REAL MECHARM 270'
             )
 
     def command_callback(
@@ -119,21 +130,19 @@ class ArmInterface(Node):
         message,
     ):
 
-        if len(
-            message.data
-        ) != 6:
-
-            self.get_logger().error(
-                'Rejected arm command: '
-                'exactly six joint values are required.'
-            )
-
-            return
-
         values = [
             float(value)
             for value in message.data
         ]
+
+        if len(values) != 6:
+
+            self.get_logger().error(
+                'Rejected arm command: '
+                'six joints required.'
+            )
+
+            return
 
         if not all(
             math.isfinite(value)
@@ -142,12 +151,12 @@ class ArmInterface(Node):
 
             self.get_logger().error(
                 'Rejected arm command: '
-                'non-finite joint value.'
+                'non-finite value.'
             )
 
             return
 
-        if self.mode == 0:
+        if self.config.is_simulation:
 
             for publisher, value in zip(
                 self.sim_publishers,
