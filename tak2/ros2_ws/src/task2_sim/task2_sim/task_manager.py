@@ -124,6 +124,32 @@ class TaskManager(Node):
             )
         )
 
+        # -----------------------------------------------------
+        # IMPORTANT:
+        #
+        # /task2/robot_state can come from:
+        #
+        #   MEASURED
+        #       actual Gazebo / real robot feedback
+        #
+        #   COMMAND_FALLBACK
+        #       only a command estimate
+        #
+        # Startup homing must NEVER use COMMAND_FALLBACK as
+        # an actual robot posture.
+        # -----------------------------------------------------
+
+        self.robot_state_source_sub = (
+            self.create_subscription(
+                String,
+                common[
+                    'robot_state_source_topic'
+                ],
+                self.robot_state_source_callback,
+                10,
+            )
+        )
+
         self.safety_stop_sub = (
             self.create_subscription(
                 Bool,
@@ -297,6 +323,13 @@ class TaskManager(Node):
         # ====================================================
 
         self.current_joint_state = None
+
+        # State validity source:
+        #
+        # UNKNOWN
+        # MEASURED
+        # COMMAND_FALLBACK
+        self.robot_state_source = 'UNKNOWN'
 
         # The simulated robot is spawned in HOME.
         # Keep the internal command reference consistent with
@@ -617,26 +650,95 @@ class TaskManager(Node):
 
         if not self.startup_motion_started:
 
-            if self.current_joint_state is None:
+            # -------------------------------------------------
+            # Wait specifically for REAL measured joint state.
+            #
+            # COMMAND_FALLBACK may initially contain six zeros
+            # even though Gazebo has already spawned the robot
+            # in HOME. Using those zeros creates a completely
+            # false startup trajectory and causes the visible
+            # up/down twitch.
+            # -------------------------------------------------
+
+            if (
+                self.current_joint_state is None
+                or
+                self.robot_state_source != 'MEASURED'
+            ):
+
                 return
 
-            self.commanded_pose = list(
+            measured_pose = list(
                 self.current_joint_state
             )
 
-            self.motion_start_pose = list(
-                self.current_joint_state
+            maximum_home_error = max(
+                abs(
+                    measured_pose[index]
+                    -
+                    self.home[index]
+                )
+                for index in range(6)
             )
 
             self.publish_gripper_command(
                 self.gripper_open
             )
 
+            # -------------------------------------------------
+            # Gazebo JointPositionController already spawns at
+            # HOME through <initial_position>.
+            #
+            # If measured joints confirm that we are already
+            # close to HOME, do NOT move away and come back.
+            # Simply hold HOME and settle.
+            # -------------------------------------------------
+
+            if (
+                maximum_home_error
+                <=
+                math.radians(3.0)
+            ):
+
+                self.commanded_pose = list(
+                    self.home
+                )
+
+                self.publish_joint_command(
+                    self.home
+                )
+
+                self.startup_motion_started = True
+                self.startup_motion_finished = True
+
+                self.startup_hold_until = (
+                    self.now_seconds()
+                    +
+                    0.60
+                )
+
+                self.get_logger().info(
+                    'INITIALISING: measured robot '
+                    'already at HOME; holding position.'
+                )
+
+                return
+
+            # -------------------------------------------------
+            # Only if measured hardware is genuinely away from
+            # HOME do we create ONE smooth trajectory.
+            # -------------------------------------------------
+
+            self.commanded_pose = list(
+                measured_pose
+            )
+
+            self.motion_start_pose = list(
+                measured_pose
+            )
+
             self.start_motion(
                 self.home,
-
-                # Deliberately slower than normal HOME only for
-                # the initial settling movement.
                 max(
                     1.8,
                     self.home_duration,
@@ -646,7 +748,8 @@ class TaskManager(Node):
             self.startup_motion_started = True
 
             self.get_logger().info(
-                'INITIALISING: smooth motion to HOME.'
+                'INITIALISING: measured robot away from HOME; '
+                'starting one smooth HOME motion.'
             )
 
             return
@@ -985,6 +1088,16 @@ class TaskManager(Node):
     # ========================================================
     # Robot / safety feedback
     # ========================================================
+
+    def robot_state_source_callback(
+        self,
+        message,
+    ):
+
+        self.robot_state_source = (
+            message.data.strip()
+        )
+
 
     def robot_state_callback(
         self,
