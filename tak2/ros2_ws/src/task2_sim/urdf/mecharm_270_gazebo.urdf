@@ -245,6 +245,8 @@
     <plugin filename="ignition-gazebo-joint-position-controller-system"
             name="ignition::gazebo::systems::JointPositionController">
       <joint_name>joint1_to_base</joint_name>
+
+      <initial_position>0.0</initial_position>
       <topic>/task2/joint1/cmd_pos</topic>
       <p_gain>8.0</p_gain>
       <i_gain>0.1</i_gain>
@@ -254,6 +256,8 @@
     <plugin filename="ignition-gazebo-joint-position-controller-system"
             name="ignition::gazebo::systems::JointPositionController">
       <joint_name>joint2_to_joint1</joint_name>
+
+      <initial_position>-0.349066</initial_position>
       <topic>/task2/joint2/cmd_pos</topic>
       <p_gain>8.0</p_gain>
       <i_gain>0.1</i_gain>
@@ -263,6 +267,8 @@
     <plugin filename="ignition-gazebo-joint-position-controller-system"
             name="ignition::gazebo::systems::JointPositionController">
       <joint_name>joint3_to_joint2</joint_name>
+
+      <initial_position>-1.22173</initial_position>
       <topic>/task2/joint3/cmd_pos</topic>
       <p_gain>8.0</p_gain>
       <i_gain>0.1</i_gain>
@@ -272,6 +278,8 @@
     <plugin filename="ignition-gazebo-joint-position-controller-system"
             name="ignition::gazebo::systems::JointPositionController">
       <joint_name>joint4_to_joint3</joint_name>
+
+      <initial_position>0.0</initial_position>
       <topic>/task2/joint4/cmd_pos</topic>
       <p_gain>5.0</p_gain>
       <i_gain>0.05</i_gain>
@@ -281,6 +289,8 @@
     <plugin filename="ignition-gazebo-joint-position-controller-system"
             name="ignition::gazebo::systems::JointPositionController">
       <joint_name>joint5_to_joint4</joint_name>
+
+      <initial_position>1.570796</initial_position>
       <topic>/task2/joint5/cmd_pos</topic>
       <p_gain>5.0</p_gain>
       <i_gain>0.05</i_gain>
@@ -290,6 +300,8 @@
     <plugin filename="ignition-gazebo-joint-position-controller-system"
             name="ignition::gazebo::systems::JointPositionController">
       <joint_name>joint6_to_joint5</joint_name>
+
+      <initial_position>0.0</initial_position>
       <topic>/task2/joint6/cmd_pos</topic>
       <p_gain>4.0</p_gain>
       <i_gain>0.05</i_gain>

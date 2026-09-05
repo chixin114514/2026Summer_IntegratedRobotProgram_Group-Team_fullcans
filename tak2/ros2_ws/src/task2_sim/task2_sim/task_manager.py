@@ -298,12 +298,12 @@ class TaskManager(Node):
 
         self.current_joint_state = None
 
-        self.commanded_pose = [
-            0.0
-            for _ in range(
-                6
-            )
-        ]
+        # The simulated robot is spawned in HOME.
+        # Keep the internal command reference consistent with
+        # that physical initial configuration.
+        self.commanded_pose = list(
+            self.home
+        )
 
         self.safety_stopped = False
 
@@ -390,7 +390,7 @@ class TaskManager(Node):
                 'motion',
                 self.home,
                 self.home_duration,
-                1.0,
+                0.20,
             ),
 
             (
@@ -406,7 +406,7 @@ class TaskManager(Node):
                 'motion',
                 self.a_safe,
                 self.approach_duration,
-                1.0,
+                0.20,
             ),
 
             (
@@ -414,7 +414,7 @@ class TaskManager(Node):
                 'motion',
                 self.a_pick,
                 self.descend_duration,
-                1.0,
+                0.25,
             ),
 
             (
@@ -430,7 +430,7 @@ class TaskManager(Node):
                 'motion',
                 self.a_safe,
                 self.lift_duration,
-                1.0,
+                0.20,
             ),
 
             (
@@ -438,7 +438,7 @@ class TaskManager(Node):
                 'motion',
                 self.b_safe,
                 self.transfer_duration,
-                1.0,
+                0.20,
             ),
 
             (
@@ -446,7 +446,7 @@ class TaskManager(Node):
                 'motion',
                 self.b_place,
                 self.descend_duration,
-                1.0,
+                0.25,
             ),
 
             (
@@ -462,7 +462,7 @@ class TaskManager(Node):
                 'motion',
                 self.b_safe,
                 self.lift_duration,
-                1.0,
+                0.20,
             ),
 
             (
@@ -470,7 +470,7 @@ class TaskManager(Node):
                 'motion',
                 self.home,
                 self.home_duration,
-                1.0,
+                0.20,
             ),
         ]
 
@@ -769,8 +769,24 @@ class TaskManager(Node):
 
         self.motion_active = False
 
-        # Start every trial from the current reported posture.
-        if self.current_joint_state is not None:
+        # -----------------------------------------------------
+        # Trial-start reference
+        #
+        # Simulation:
+        # the previous trial already ended at commanded HOME.
+        # Preserve that continuous command reference. Gazebo
+        # feedback may lag slightly and must not create a false
+        # command jump at the next trial.
+        #
+        # Real robot:
+        # always begin from measured hardware state.
+        # -----------------------------------------------------
+
+        if (
+            self.config.is_real_robot
+            and
+            self.current_joint_state is not None
+        ):
 
             self.commanded_pose = list(
                 self.current_joint_state

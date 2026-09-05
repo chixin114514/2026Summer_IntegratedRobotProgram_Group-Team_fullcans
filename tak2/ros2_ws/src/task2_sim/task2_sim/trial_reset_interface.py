@@ -361,10 +361,12 @@ class TrialResetInterface(Node):
 
         self.pending_sim_done = True
 
+        # The object needs only a short settling period after
+        # being teleported back to point A.
         self.sim_done_time = (
             self.now_seconds()
             +
-            1.0
+            0.40
         )
 
     # ========================================================
