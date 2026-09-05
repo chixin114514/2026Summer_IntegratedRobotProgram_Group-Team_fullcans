@@ -1,193 +1,72 @@
-# ============================================================
-# Fixed-point pick-and-place task configuration
-#
-# Coordinates are expressed relative to the robot base frame.
-# ============================================================
-
 home:
-
   joints_deg:
-    - 0.0
-    - -20.0
-    - -70.0
-    - 0.0
-    - 90.0
-    - 0.0
-
-
+  - 0.0
+  - -20.0
+  - -70.0
+  - 0.0
+  - 90.0
+  - 0.0
 point_a:
-
-  x: 0.180
-
-  y: 0.100
-
-  z: 0.040
-
-
+  x: 0.16
+  y: 0.09
+  z: 0.028
 point_b:
-
-  x: 0.180
-
-  y: -0.100
-
-  z: 0.040
-
-
+  x: 0.18
+  y: -0.1
+  z: 0.028
 safe_height:
-
-  z: 0.110
-
-
+  z: 0.085
 motion:
-
-  simulation_speed_scale:
-    0.40
-
-  real_speed_scale:
-    0.20
-
-  home_duration_s:
-    4.0
-
-  approach_duration_s:
-    4.0
-
-  descend_duration_s:
-    3.0
-
-  lift_duration_s:
-    3.5
-
-  transfer_duration_s:
-    5.0
-
-
+  simulation_speed_scale: 0.4
+  real_speed_scale: 0.2
+  home_duration_s: 2.5
+  approach_duration_s: 2.2
+  descend_duration_s: 1.5
+  lift_duration_s: 1.8
+  transfer_duration_s: 2.7
 gripper:
-
-  open_position:
-    0.000
-
-  closed_position:
-    0.008
-
-  close_duration_s:
-    1.5
-
-  open_duration_s:
-    1.5
-
-
+  open_position: 0.0
+  closed_position: 0.008
+  close_duration_s: 0.9
+  open_duration_s: 0.8
 experiment:
-
-  total_trials:
-    5
-
-  required_successes:
-    4
-
-
-# ============================================================
-# Kinematics / IK configuration
-#
-# These parameters are explicit so the task can be calibrated
-# without rewriting task_manager.py.
-# ============================================================
-
+  total_trials: 5
+  required_successes: 4
 kinematics:
-
-  # Tool centre point offset from the final wrist frame.
-  tool_offset_m:
-    0.045
-
-  # Calibrated seed close to point A.
-  #
-  # This was obtained using the interactive tuning panel.
+  tool_offset_m: 0.045
   pick_seed_deg:
-    - 25.0
-    - 54.0
-    - -13.0
-    - 33.0
-    - 29.0
-    - 88.0
-
-  # Initial seed for the B side.
+  - 25.0
+  - 54.0
+  - -13.0
+  - 33.0
+  - 29.0
+  - 88.0
   place_seed_deg:
-    - -25.0
-    - 54.0
-    - -13.0
-    - 33.0
-    - 29.0
-    - 88.0
-
+  - -25.0
+  - 54.0
+  - -13.0
+  - 33.0
+  - 29.0
+  - 88.0
   solver:
-
-    maximum_iterations:
-      400
-
-    numerical_step_rad:
-      0.001
-
-    damping:
-      0.03
-
-    maximum_iteration_step_rad:
-      0.08
-
-
-# ============================================================
-# Acceptance / result evaluation
-# ============================================================
-
+    maximum_iterations: 400
+    numerical_step_rad: 0.001
+    damping: 0.03
+    maximum_iteration_step_rad: 0.08
 acceptance:
-
-  # Simulation waits briefly after the complete motion sequence
-  # before evaluating the final object pose.
-  settle_time_s:
-    1.0
-
-  # For a 50 mm square block inside a 45 mm-radius placement
-  # circle, approximately 9 mm centre tolerance keeps the
-  # complete block inside the designated region.
-  placement_xy_tolerance_m:
-    0.009
-
-  # Expected centre height of the 50 mm cube on the table.
-  simulation_object_center_z_m:
-    0.425
-
-  placement_z_tolerance_m:
-    0.008
-
-  # The block should be approximately upright / flat.
-  maximum_tilt_deg:
-    8.0
-
-  object_pose_timeout_s:
-    1.0
-
-
-# ============================================================
-# Simulation-only reset pose
-#
-# These values are WORLD coordinates used only to place the
-# simulated object back at A between acceptance trials.
-# They do not change task_manager.py.
-# ============================================================
-
+  settle_time_s: 1.0
+  placement_xy_tolerance_m: 0.009
+  simulation_object_center_z_m: 0.425
+  placement_z_tolerance_m: 0.008
+  maximum_tilt_deg: 8.0
+  object_pose_timeout_s: 1.0
 simulation_reset:
-
-  object_name:
-    target_object
-
-  world_name:
-    task2_world
-
+  object_name: target_object
+  world_name: task2_world
   point_a_world:
-
-    x: 0.180
-    y: 0.100
+    x: 0.16
+    y: 0.09
     z: 0.425
-
     roll: 0.0
     pitch: 0.0
     yaw: 0.0

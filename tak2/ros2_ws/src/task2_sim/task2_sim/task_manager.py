@@ -900,7 +900,26 @@ class TaskManager(Node):
         # If feedback has not arrived yet, use the most recent
         # commanded pose.
 
-        if (
+        # -----------------------------------------------------
+        # Motion start source
+        #
+        # Simulation:
+        # keep the commanded trajectory continuous. Gazebo
+        # measured joints naturally lag the controller by a
+        # small amount; restarting from delayed feedback can
+        # create an artificial command jump at state changes.
+        #
+        # Real robot:
+        # always prefer measured hardware state for safety.
+        # -----------------------------------------------------
+
+        if self.config.is_simulation:
+
+            start_pose = list(
+                self.commanded_pose
+            )
+
+        elif (
             self.current_joint_state
             is not None
         ):

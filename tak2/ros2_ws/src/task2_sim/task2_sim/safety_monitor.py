@@ -97,16 +97,35 @@ class SafetyMonitor(Node):
                 )
             )
 
+        if self.config.is_simulation:
+
+            maximum_step_deg = float(
+                safety[
+                    'motion'
+                ][
+                    'maximum_joint_step_deg_simulation'
+                ]
+            )
+
+        else:
+
+            maximum_step_deg = float(
+                safety[
+                    'motion'
+                ][
+                    'maximum_joint_step_deg_real'
+                ]
+            )
+
         self.maximum_joint_step = (
             math.radians(
-                float(
-                    safety[
-                        'motion'
-                    ][
-                        'maximum_joint_step_deg'
-                    ]
-                )
+                maximum_step_deg
             )
+        )
+
+        self.get_logger().info(
+            'Maximum command step: '
+            f'{maximum_step_deg:.1f} deg'
         )
 
         # -----------------------------------------------------
