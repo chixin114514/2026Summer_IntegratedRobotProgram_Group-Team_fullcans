@@ -12,8 +12,16 @@
       name="default_physics"
       type="ignored">
 
+      <!--
+        2 ms physics step = approximately 500 Hz.
+
+        This is still much faster than the 25 Hz ROS command
+        loop and gives about 20 physics integration steps
+        between consecutive arm commands, while substantially
+        reducing Jetson CPU load.
+      -->
       <max_step_size>
-        0.001
+        0.002
       </max_step_size>
 
       <real_time_factor>
@@ -40,8 +48,12 @@
       type="directional"
       name="sun">
 
+      <!--
+        Shadows are visual only and are unnecessary for the
+        Task 2 acceptance demonstration.
+      -->
       <cast_shadows>
-        true
+        false
       </cast_shadows>
 
       <pose>

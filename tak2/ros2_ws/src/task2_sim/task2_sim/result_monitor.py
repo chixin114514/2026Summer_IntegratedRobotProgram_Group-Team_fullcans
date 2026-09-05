@@ -178,7 +178,11 @@ class ResultMonitor(Node):
                     TFMessage,
                     pose_topic,
                     self.pose_callback,
-                    10,
+
+                    # Only the newest world pose matters.
+                    # Do not build a backlog when Jetson is
+                    # temporarily busy rendering Gazebo.
+                    1,
                 )
             )
 
@@ -247,6 +251,9 @@ class ResultMonitor(Node):
 
         self.pending_result = True
 
+        self.last_object_transform = None
+        self.last_object_pose_time = None
+
         self.evaluate_after = (
             self.now_seconds()
             +
@@ -290,6 +297,15 @@ class ResultMonitor(Node):
         self,
         message,
     ):
+
+        # The object pose is only required after the complete
+        # pick-and-place sequence has finished.
+        #
+        # During robot motion this callback deliberately does
+        # no world-pose parsing work.
+        if not self.pending_result:
+
+            return
 
         best = None
 

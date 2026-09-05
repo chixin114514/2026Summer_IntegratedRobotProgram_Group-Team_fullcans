@@ -526,10 +526,16 @@ class TaskManager(Node):
 
         if self.config.is_simulation:
 
-            self.control_period = 0.02
+            # 25 Hz is sufficient for smooth simulated motion
+            # while avoiding unnecessary CPU / bridge load.
+            #
+            # 50 Hz doubled the ROS -> Gazebo command traffic
+            # without making the total trajectory faster.
+            self.control_period = 0.04
 
         else:
 
+            # Real robot remains at 20 Hz.
             self.control_period = 0.05
 
         self.timer = (
