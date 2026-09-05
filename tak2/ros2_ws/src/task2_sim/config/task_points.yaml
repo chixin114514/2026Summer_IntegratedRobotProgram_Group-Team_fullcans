@@ -16,8 +16,8 @@ grasp_offset_a:
   #
   # Positive X/Y moves the gripper farther
   # outward towards the physical cube.
-  x: 0.009
-  y: 0.006
+  x: 0.008
+  y: 0.005
   z: 0.000
 
 point_b:
