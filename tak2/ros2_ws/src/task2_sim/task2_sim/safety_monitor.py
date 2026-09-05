@@ -179,6 +179,18 @@ class SafetyMonitor(Node):
             )
         )
 
+
+        self.task_fault_sub = (
+            self.create_subscription(
+                String,
+                common[
+                    'task_fault_topic'
+                ],
+                self.task_fault_callback,
+                10,
+            )
+        )
+
         self.publish_state(
             'OK'
         )
@@ -277,6 +289,34 @@ class SafetyMonitor(Node):
 
         self.publish_state(
             'OK'
+        )
+
+    # ========================================================
+    # Fault raised by task-level logic
+    #
+    # Examples:
+    #   UNREACHABLE_TARGET
+    #   IK_FAILURE
+    #   COMMUNICATION_FAILURE
+    # ========================================================
+
+    def task_fault_callback(
+        self,
+        message,
+    ):
+
+        reason = (
+            message.data.strip()
+        )
+
+        if not reason:
+
+            reason = (
+                'UNSPECIFIED_TASK_FAULT'
+            )
+
+        self.trigger_stop(
+            reason
         )
 
     # ========================================================

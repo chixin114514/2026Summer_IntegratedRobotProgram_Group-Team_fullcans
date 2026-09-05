@@ -118,6 +118,12 @@ setup(
                 'task2_sim.state_publisher:main'
             ),
 
+
+            (
+                'task_manager = '
+                'task2_sim.task_manager:main'
+            ),
+
         ],
     },
 )

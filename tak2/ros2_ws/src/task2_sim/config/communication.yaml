@@ -36,6 +36,9 @@ common:
   safety_reset_topic:
     /task2/safety_reset
 
+  task_fault_topic:
+    /task2/task_fault
+
 
 simulation:
 
