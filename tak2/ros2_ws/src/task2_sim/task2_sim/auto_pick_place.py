@@ -970,6 +970,23 @@ class AutoPickPlace(Node):
         # Hold
         # -----------------------------------------------------
 
+        # RELEASE must be reliable.
+        #
+        # A single detach message may occasionally be missed by
+        # the ROS-Gazebo bridge / detachable-joint plugin.
+        #
+        # While the RELEASE state is active, continuously send
+        # detach commands at the controller update rate.
+        #
+        # This guarantees that the cube is physically released
+        # and gravity takes over.
+
+        if name == 'RELEASE':
+
+            self.detach_pub.publish(
+                Empty()
+            )
+
         if (
             self.now_seconds()
             <

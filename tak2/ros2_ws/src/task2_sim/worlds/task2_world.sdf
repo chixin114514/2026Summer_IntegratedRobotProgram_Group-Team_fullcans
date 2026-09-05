@@ -4,6 +4,9 @@
 
   <world name="task2_world">
 
+    <!-- Explicit Earth gravity -->
+    <gravity>0 0 -9.81</gravity>
+
     <!-- Physics -->
     <physics
       name="default_physics"
@@ -174,10 +177,39 @@
 
       <link name="object_link">
 
+        <!-- Dynamic wooden block -->
+        <gravity>true</gravity>
+
         <inertial>
+
+          <pose>
+            0 0 0 0 0 0
+          </pose>
+
           <mass>
             0.05
           </mass>
+
+          <inertia>
+
+            <ixx>
+              0.0000208333
+            </ixx>
+
+            <iyy>
+              0.0000208333
+            </iyy>
+
+            <izz>
+              0.0000208333
+            </izz>
+
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyz>0</iyz>
+
+          </inertia>
+
         </inertial>
 
         <collision name="object_collision">
