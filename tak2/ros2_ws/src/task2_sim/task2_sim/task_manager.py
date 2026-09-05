@@ -272,6 +272,47 @@ class TaskManager(Node):
             ),
         ]
 
+        # ====================================================
+        # Independent B placement calibration.
+        #
+        # IMPORTANT:
+        # A grasp calibration is now LOCKED.
+        #
+        # placement_offset_b only calibrates where the robot
+        # releases the already-grasped object.
+        # ====================================================
+
+        placement_offset_b = (
+            task.get(
+                'placement_offset_b',
+                {},
+            )
+        )
+
+        self.placement_offset_b = [
+
+            float(
+                placement_offset_b.get(
+                    'x',
+                    0.0,
+                )
+            ),
+
+            float(
+                placement_offset_b.get(
+                    'y',
+                    0.0,
+                )
+            ),
+
+            float(
+                placement_offset_b.get(
+                    'z',
+                    0.0,
+                )
+            ),
+        ]
+
         self.safe_height = float(
             task[
                 'safe_height'
@@ -754,6 +795,8 @@ class TaskManager(Node):
             self.point_b[index]
             +
             self.grasp_offset_a[index]
+            +
+            self.placement_offset_b[index]
 
             for index in range(
                 3
@@ -836,7 +879,10 @@ class TaskManager(Node):
             f'{self.b_release_target[1]:.3f}) '
             f'grasp_offset=('
             f'{self.grasp_offset_a[0] * 1000:.0f}, '
-            f'{self.grasp_offset_a[1] * 1000:.0f}) mm'
+            f'{self.grasp_offset_a[1] * 1000:.0f}) mm '
+            f'place_offset=('
+            f'{self.placement_offset_b[0] * 1000:.0f}, '
+            f'{self.placement_offset_b[1] * 1000:.0f}) mm'
         )
 
         # -----------------------------------------------------

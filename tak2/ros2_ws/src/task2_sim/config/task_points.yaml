@@ -24,6 +24,18 @@ point_b:
   x: 0.16
   y: -0.09
   z: 0.028
+placement_offset_b:
+  # Independent B placement calibration.
+  # A grasp calibration is LOCKED and must not be changed.
+  #
+  # Robot frame:
+  #   +X = forward
+  #   +Y = left
+  #   -Y = right
+  x: 0.000
+  y: -0.005
+  z: 0.000
+
 safe_height:
   z: 0.110
 motion:
