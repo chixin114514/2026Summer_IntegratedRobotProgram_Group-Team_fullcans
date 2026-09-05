@@ -1,11 +1,11 @@
 mode: 0
 robot:
-  name: mecharm_270
+  name: mecharm_270_pi
   dof: 6
   base_frame: base
   tool_frame: gripper_palm
 gripper:
-  type: parallel_two_finger
+  type: mycobot_gripper_ag
   enabled: true
 simulation:
   enabled_when_mode: 0
@@ -14,7 +14,7 @@ simulation:
   target_entity_name: target_object
 real:
   enabled_when_mode: 1
-  robot_model: mecharm_270
+  robot_model: mecharm_270_pi
   serial_device: /dev/ttyUSB0
   baudrate: 115200
   timeout_s: 1.0

@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<robot  xmlns:xacro="http://www.ros.org/wiki/xacro" name="firefighter" >
+<robot  xmlns:xacro="http://www.ros.org/wiki/xacro" name="mecharm_270_pi" >
 
   <!--
     Physical mounting condition:
@@ -363,7 +363,7 @@
 
     <inertial>
       <origin xyz="0 0 0.0075"/>
-      <mass value="0.08"/>
+      <mass value="0.05"/>
       <inertia
         ixx="0.00008"
         ixy="0"
@@ -434,7 +434,7 @@
     <child link="left_finger"/>
 
     <origin
-      xyz="0.035 0 0.015"
+      xyz="0.0265 0 0.015"
       rpy="0 0 0"/>
 
     <!-- Positive motion moves toward centre -->
@@ -442,7 +442,7 @@
 
     <limit
       lower="0.0"
-      upper="0.010"
+      upper="0.0125"
       effort="60"
       velocity="0.04"/>
 
@@ -497,7 +497,7 @@
     <child link="right_finger"/>
 
     <origin
-      xyz="-0.035 0 0.015"
+      xyz="-0.0265 0 0.015"
       rpy="0 0 0"/>
 
     <!-- Positive motion moves toward centre -->
@@ -505,7 +505,7 @@
 
     <limit
       lower="0.0"
-      upper="0.010"
+      upper="0.0125"
       effort="60"
       velocity="0.04"/>
 

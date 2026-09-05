@@ -414,9 +414,9 @@ class TaskManager(Node):
                 'motion',
                 self.a_pregrasp,
 
-                # Move into the final wrist orientation while
+                # Move into final wrist orientation while
                 # still safely above the cube.
-                0.80,
+                1.00,
                 0.15,
             ),
 
@@ -425,8 +425,9 @@ class TaskManager(Node):
                 'motion',
                 self.a_pick,
 
-                # Short final insertion.
-                0.70,
+                # Slow final insertion, matching the
+                # low-speed real-robot demonstration.
+                1.00,
                 0.25,
             ),
 
@@ -656,7 +657,7 @@ class TaskManager(Node):
 
             self.point_a[1],
 
-            0.080,
+            0.095,
         ]
 
         b_safe_xyz = [
