@@ -148,25 +148,6 @@ class TrialResetInterface(Node):
             self.update,
         )
 
-        # -----------------------------------------------------
-        # Simulation startup scene preparation
-        #
-        # Reset the cube once BEFORE the GUI is shown.
-        # Later trial resets still use the normal request /
-        # reset-done protocol.
-        # -----------------------------------------------------
-
-        self.startup_reset_timer = None
-
-        if self.config.is_simulation:
-
-            self.startup_reset_timer = (
-                self.create_timer(
-                    2.30,
-                    self.startup_reset_once,
-                )
-            )
-
         self.get_logger().info(
             'Trial reset interface started.'
         )
@@ -175,25 +156,6 @@ class TrialResetInterface(Node):
             f'Mode: '
             f'{self.config.mode_name()}'
         )
-
-    # ========================================================
-    # One-time simulation startup reset
-    # ========================================================
-
-    def startup_reset_once(self):
-
-        if self.startup_reset_timer is None:
-            return
-
-        self.startup_reset_timer.cancel()
-        self.startup_reset_timer = None
-
-        self.get_logger().info(
-            'Preparing clean initial simulation object at A.'
-        )
-
-        self.reset_simulation_object()
-
 
     # ========================================================
     # Time
