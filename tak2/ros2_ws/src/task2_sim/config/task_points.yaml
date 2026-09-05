@@ -84,3 +84,51 @@ experiment:
 
   required_successes:
     4
+
+
+# ============================================================
+# Kinematics / IK configuration
+#
+# These parameters are explicit so the task can be calibrated
+# without rewriting task_manager.py.
+# ============================================================
+
+kinematics:
+
+  # Tool centre point offset from the final wrist frame.
+  tool_offset_m:
+    0.045
+
+  # Calibrated seed close to point A.
+  #
+  # This was obtained using the interactive tuning panel.
+  pick_seed_deg:
+    - 25.0
+    - 54.0
+    - -13.0
+    - 33.0
+    - 29.0
+    - 88.0
+
+  # Initial seed for the B side.
+  place_seed_deg:
+    - -25.0
+    - 54.0
+    - -13.0
+    - 33.0
+    - 29.0
+    - 88.0
+
+  solver:
+
+    maximum_iterations:
+      400
+
+    numerical_step_rad:
+      0.001
+
+    damping:
+      0.03
+
+    maximum_iteration_step_rad:
+      0.08
