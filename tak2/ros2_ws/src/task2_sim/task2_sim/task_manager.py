@@ -365,10 +365,43 @@ class TaskManager(Node):
             ]
         )
 
-        self.cartesian_path_step = float(
+        # ====================================================
+        # Online resolved-rate Cartesian servo
+        # ====================================================
+
+        self.cartesian_servo_joint_step = (
+            math.radians(
+                float(
+                    motion.get(
+                        'cartesian_servo_joint_step_deg',
+                        1.0,
+                    )
+                )
+            )
+        )
+
+        self.cartesian_servo_position_tolerance = float(
             motion.get(
-                'cartesian_path_step_m',
-                0.005,
+                'cartesian_servo_position_tolerance_m',
+                0.006,
+            )
+        )
+
+        self.cartesian_servo_orientation_tolerance = (
+            math.radians(
+                float(
+                    motion.get(
+                        'cartesian_servo_orientation_tolerance_deg',
+                        1.0,
+                    )
+                )
+            )
+        )
+
+        self.cartesian_servo_timeout = float(
+            motion.get(
+                'cartesian_servo_timeout_s',
+                3.0,
             )
         )
 
@@ -476,21 +509,28 @@ class TaskManager(Node):
         self.motion_duration = 1.0
 
         # -----------------------------------------------------
-        # Dense Cartesian-path execution.
-        #
-        # Joint interpolation is still used only between two
-        # neighbouring IK samples. Because those samples are
-        # only ~5 mm apart and all have exactly the same tool
-        # rotation, the gripper remains effectively upright.
+        # Online Cartesian servo runtime.
         # -----------------------------------------------------
 
-        self.path_active = False
+        self.cartesian_active = False
 
-        self.path_waypoints = []
+        self.cartesian_start_xyz = [
+            0.0,
+            0.0,
+            0.0,
+        ]
 
-        self.path_start_time = 0.0
+        self.cartesian_target_xyz = [
+            0.0,
+            0.0,
+            0.0,
+        ]
 
-        self.path_duration = 1.0
+        self.cartesian_start_time = 0.0
+
+        self.cartesian_duration = 1.0
+
+        self.cartesian_deadline = 0.0
 
         self.hold_until = 0.0
 
@@ -562,8 +602,8 @@ class TaskManager(Node):
 
             (
                 'A_PREGRASP',
-                'path',
-                self.path_a_pregrasp,
+                'cartesian',
+                self.a_pregrasp_xyz,
 
                 # Move into final wrist orientation while
                 # still safely above the cube.
@@ -573,8 +613,8 @@ class TaskManager(Node):
 
             (
                 'A_PICK',
-                'path',
-                self.path_a_pick,
+                'cartesian',
+                self.a_pick_xyz,
 
                 # Slow final insertion, matching the
                 # low-speed real-robot demonstration.
@@ -592,8 +632,8 @@ class TaskManager(Node):
 
             (
                 'A_LIFT',
-                'path',
-                self.path_a_lift,
+                'cartesian',
+                self.a_safe_xyz,
                 self.lift_duration,
 
                 # After the cube reaches the higher safe
@@ -605,16 +645,16 @@ class TaskManager(Node):
 
             (
                 'B_SAFE',
-                'path',
-                self.path_b_safe,
+                'cartesian',
+                self.b_safe_xyz,
                 self.transfer_duration,
                 0.20,
             ),
 
             (
                 'B_PLACE',
-                'path',
-                self.path_b_place,
+                'cartesian',
+                self.b_place_xyz,
                 self.descend_duration,
 
                 # Let the cube settle on the table before
@@ -649,8 +689,8 @@ class TaskManager(Node):
 
             (
                 'B_LIFT',
-                'path',
-                self.path_b_lift,
+                'cartesian',
+                self.b_safe_xyz,
                 self.lift_duration,
                 0.20,
             ),
@@ -1013,385 +1053,40 @@ class TaskManager(Node):
 
 
         # =====================================================
-        # Dense upright Cartesian paths
+        # Online Cartesian servo targets
         #
-        # IMPORTANT:
-        #
-        # The old controller only constrained orientation at
-        # the END of each motion state. Between endpoints it
-        # interpolated J1-J6 directly, so the tool could tilt.
-        #
-        # We now generate small Cartesian samples. Every sample
-        # uses exactly transport_rotation:
-        #
-        #   tool vertical
-        #   gripper edges parallel to cube edges
-        #   held cube level with table
-        #
-        # High-level task states are unchanged.
+        # Only the important endpoint poses are solved here.
+        # No dense path is precomputed.
         # =====================================================
 
-        def build_cartesian_path(
-            start_xyz,
-            end_xyz,
-            start_pose,
-            end_pose,
-        ):
-
-            dx = (
-                end_xyz[0]
-                -
-                start_xyz[0]
-            )
-
-            dy = (
-                end_xyz[1]
-                -
-                start_xyz[1]
-            )
-
-            dz = (
-                end_xyz[2]
-                -
-                start_xyz[2]
-            )
-
-            distance = math.sqrt(
-                dx * dx
-                +
-                dy * dy
-                +
-                dz * dz
-            )
-
-            segment_count = max(
-                1,
-                int(
-                    math.ceil(
-                        distance
-                        /
-                        max(
-                            0.001,
-                            self.cartesian_path_step,
-                        )
-                    )
-                ),
-            )
-
-            path = [
-                list(
-                    start_pose
-                )
-            ]
-
-            previous_pose = list(
-                start_pose
-            )
-
-            for step_index in range(
-                1,
-                segment_count + 1,
-            ):
-
-                fraction = (
-                    step_index
-                    /
-                    segment_count
-                )
-
-                xyz = [
-
-                    start_xyz[0]
-                    +
-                    dx
-                    *
-                    fraction,
-
-                    start_xyz[1]
-                    +
-                    dy
-                    *
-                    fraction,
-
-                    start_xyz[2]
-                    +
-                    dz
-                    *
-                    fraction,
-                ]
-
-                # ---------------------------------------------
-                # Primary seed:
-                # interpolate between two already-valid
-                # endpoint joint solutions.
-                #
-                # This keeps numerical IK on the intended
-                # upright physical branch.
-                # ---------------------------------------------
-
-                interpolated_seed = [
-
-                    start_pose[index]
-                    +
-                    (
-                        end_pose[index]
-                        -
-                        start_pose[index]
-                    )
-                    *
-                    fraction
-
-                    for index in range(
-                        6
-                    )
-                ]
-
-                candidate_seeds = [
-
-                    interpolated_seed,
-
-                    previous_pose,
-
-                    list(
-                        end_pose
-                    ),
-
-                    list(
-                        start_pose
-                    ),
-                ]
-
-                solved_pose = None
-                last_error = None
-
-                for candidate_seed in (
-                    candidate_seeds
-                ):
-
-                    try:
-
-                        solved_pose = (
-                            self.kinematics.solve_pose(
-                                xyz,
-                                transport_rotation,
-                                candidate_seed,
-                                position_tolerance=0.008,
-                            )
-                        )
-
-                        break
-
-                    except KinematicsError as error:
-
-                        last_error = error
-
-                if solved_pose is None:
-
-                    raise NoIKSolutionError(
-                        'Cartesian path IK failed at '
-                        f'fraction={fraction:.3f}, '
-                        f'target={xyz}: '
-                        f'{last_error}'
-                    )
-
-                previous_pose = list(
-                    solved_pose
-                )
-
-                path.append(
-                    list(
-                        solved_pose
-                    )
-                )
-
-            # The final waypoint is already a validated exact
-            # endpoint solution. Use it explicitly.
-            path[-1] = list(
-                end_pose
-            )
-
-            return path
-
-
-        # -----------------------------------------------------
-        # A_SAFE -> A_PREGRASP
-        #
-        # X/Y fixed.
-        # Only Z decreases.
-        # Tool orientation is fixed upright.
-        # -----------------------------------------------------
-
-        self.path_a_pregrasp = (
-            build_cartesian_path(
-                a_safe_xyz,
-                a_pregrasp_xyz,
-                self.a_safe,
-                self.a_pregrasp,
-            )
+        self.upright_rotation = (
+            transport_rotation
         )
 
-        self.a_pregrasp = list(
-            self.path_a_pregrasp[
-                -1
-            ]
+        self.a_safe_xyz = list(
+            a_safe_xyz
         )
 
-
-        # -----------------------------------------------------
-        # A_PREGRASP -> A_PICK
-        #
-        # Final vertical insertion.
-        # -----------------------------------------------------
-
-        self.path_a_pick = (
-            build_cartesian_path(
-                a_pregrasp_xyz,
-                self.a_grasp_target,
-                self.a_pregrasp,
-                self.a_pick,
-            )
+        self.a_pregrasp_xyz = list(
+            a_pregrasp_xyz
         )
 
-        self.a_pick = list(
-            self.path_a_pick[
-                -1
-            ]
+        self.a_pick_xyz = list(
+            self.a_grasp_target
         )
 
-
-        # -----------------------------------------------------
-        # A_PICK -> A_SAFE
-        #
-        # EXACT reverse of the downward Cartesian grasp path.
-        #
-        # The held cube therefore rises vertically instead of
-        # being swept sideways.
-        # -----------------------------------------------------
-
-        full_a_down_path = (
-            self.path_a_pregrasp
-            +
-            self.path_a_pick[
-                1:
-            ]
+        self.b_safe_xyz = list(
+            b_safe_xyz
         )
 
-        self.path_a_lift = [
-            list(pose)
-            for pose in reversed(
-                full_a_down_path
-            )
-        ]
-
-
-        # -----------------------------------------------------
-        # A_SAFE -> B_SAFE
-        #
-        # Constant Z.
-        # Constant upright rotation.
-        #
-        # This is the horizontal level transport.
-        # -----------------------------------------------------
-
-        self.path_b_safe = (
-            build_cartesian_path(
-                a_safe_xyz,
-                b_safe_xyz,
-                self.a_safe,
-                self.b_safe,
-            )
+        self.b_place_xyz = list(
+            self.b_release_target
         )
 
-        self.b_safe = list(
-            self.path_b_safe[
-                -1
-            ]
+        self.get_logger().info(
+            'Cartesian servo targets ready; '
+            'dense offline IK disabled.'
         )
-
-
-        # -----------------------------------------------------
-        # B_SAFE -> B_PLACE
-        #
-        # Vertical placement only.
-        # -----------------------------------------------------
-
-        self.path_b_place = (
-            build_cartesian_path(
-                b_safe_xyz,
-                self.b_release_target,
-                self.b_safe,
-                self.b_place,
-            )
-        )
-
-        self.b_place = list(
-            self.path_b_place[
-                -1
-            ]
-        )
-
-
-        # -----------------------------------------------------
-        # B_PLACE -> B_SAFE
-        #
-        # Vertical withdrawal after release.
-        # -----------------------------------------------------
-
-        self.path_b_lift = [
-            list(pose)
-            for pose in reversed(
-                self.path_b_place
-            )
-        ]
-
-
-        # Validate every Cartesian IK sample before allowing
-        # the experiment to start.
-
-        for path_name, path in [
-
-            (
-                'A_PREGRASP_PATH',
-                self.path_a_pregrasp,
-            ),
-
-            (
-                'A_PICK_PATH',
-                self.path_a_pick,
-            ),
-
-            (
-                'A_LIFT_PATH',
-                self.path_a_lift,
-            ),
-
-            (
-                'B_SAFE_PATH',
-                self.path_b_safe,
-            ),
-
-            (
-                'B_PLACE_PATH',
-                self.path_b_place,
-            ),
-
-            (
-                'B_LIFT_PATH',
-                self.path_b_lift,
-            ),
-
-        ]:
-
-            for pose in path:
-
-                self.kinematics.validate_joints(
-                    pose
-                )
-
-            self.get_logger().info(
-                f'{path_name}: '
-                f'{len(path)} Cartesian IK samples'
-            )
 
 
         self.get_logger().info(
@@ -1515,7 +1210,7 @@ class TaskManager(Node):
         self.state_started = False
 
         self.motion_active = False
-        self.path_active = False
+        self.cartesian_active = False
 
         # -----------------------------------------------------
         # Trial-start reference
@@ -1586,7 +1281,7 @@ class TaskManager(Node):
         self.task_stopped = True
 
         self.motion_active = False
-        self.path_active = False
+        self.cartesian_active = False
 
         self.get_logger().error(
             'Task manager received SAFE_STOP.'
@@ -1627,7 +1322,7 @@ class TaskManager(Node):
         self.task_stopped = True
 
         self.motion_active = False
-        self.path_active = False
+        self.cartesian_active = False
 
         reason = str(
             reason
@@ -1804,32 +1499,44 @@ class TaskManager(Node):
 
         self.motion_active = True
 
-    def start_path_motion(
+    # ========================================================
+    # Online resolved-rate Cartesian servo
+    #
+    # This avoids:
+    #   - hundreds of startup IK solves
+    #   - IK branch jumps between dense samples
+    #   - long startup pauses
+    #
+    # At every 20 Hz control tick:
+    #
+    # desired Cartesian pose
+    #       ↓
+    # pose error
+    #       ↓
+    # numerical Jacobian
+    #       ↓
+    # damped least squares
+    #       ↓
+    # small joint increment
+    #
+    # The tool rotation is fixed upright for the entire
+    # Cartesian movement.
+    # ========================================================
+
+    def start_cartesian_motion(
         self,
-        path,
+        target_xyz,
         duration,
     ):
 
-        if not path:
+        if len(
+            target_xyz
+        ) != 3:
 
             raise KinematicsError(
-                'Cartesian path is empty.'
+                'Cartesian target must contain XYZ.'
             )
 
-        for pose in path:
-
-            self.kinematics.validate_joints(
-                pose
-            )
-
-        # Use the same start-source policy as ordinary motion.
-        #
-        # Simulation:
-        # use continuous commanded state.
-        #
-        # Real robot:
-        # use measured hardware state at the START of the
-        # Cartesian state only.
         if self.config.is_simulation:
 
             start_pose = list(
@@ -1851,34 +1558,24 @@ class TaskManager(Node):
                 self.commanded_pose
             )
 
-        self.path_waypoints = [
+        self.kinematics.validate_joints(
             start_pose
+        )
+
+        self.commanded_pose = list(
+            start_pose
+        )
+
+        self.cartesian_start_xyz = (
+            self.kinematics.forward_position(
+                start_pose
+            )
+        )
+
+        self.cartesian_target_xyz = [
+            float(value)
+            for value in target_xyz
         ]
-
-        # The original first path pose represents the expected
-        # state boundary. The actual/current start_pose replaces
-        # it. All following samples remain the precomputed
-        # upright Cartesian path.
-        if len(path) > 1:
-
-            self.path_waypoints.extend(
-                [
-                    list(pose)
-                    for pose in path[
-                        1:
-                    ]
-                ]
-            )
-
-        else:
-
-            self.path_waypoints.append(
-                list(
-                    path[
-                        0
-                    ]
-                )
-            )
 
         effective_duration = float(
             duration
@@ -1890,30 +1587,44 @@ class TaskManager(Node):
                 self.real_motion_duration_scale
             )
 
-        self.path_start_time = (
-            self.now_seconds()
-        )
-
-        self.path_duration = max(
+        self.cartesian_duration = max(
             0.5,
             effective_duration,
         )
 
-        self.path_active = True
+        self.cartesian_start_time = (
+            self.now_seconds()
+        )
+
+        self.cartesian_deadline = (
+            self.cartesian_start_time
+            +
+            self.cartesian_duration
+            +
+            self.cartesian_servo_timeout
+        )
+
+        self.cartesian_active = True
 
 
-    def update_path_motion(self):
+    def update_cartesian_motion(
+        self,
+    ):
+
+        now = (
+            self.now_seconds()
+        )
 
         elapsed = (
-            self.now_seconds()
+            now
             -
-            self.path_start_time
+            self.cartesian_start_time
         )
 
         progress = (
             elapsed
             /
-            self.path_duration
+            self.cartesian_duration
         )
 
         progress = max(
@@ -1924,103 +1635,234 @@ class TaskManager(Node):
             ),
         )
 
-        # Smooth only the overall path timing.
-        #
-        # Spatial interpolation itself follows the sequence
-        # of upright Cartesian IK samples.
         smooth = (
             self.smoothstep(
                 progress
             )
         )
 
-        segment_count = (
-            len(
-                self.path_waypoints
+        # -----------------------------------------------------
+        # Straight Cartesian reference.
+        #
+        # Vertical states:
+        #   X/Y remain fixed.
+        #
+        # B_SAFE:
+        #   Z remains fixed.
+        #
+        # The same code handles both automatically.
+        # -----------------------------------------------------
+
+        desired_xyz = [
+
+            self.cartesian_start_xyz[index]
+            +
+            (
+                self.cartesian_target_xyz[index]
+                -
+                self.cartesian_start_xyz[index]
             )
-            -
-            1
+            *
+            smooth
+
+            for index in range(
+                3
+            )
+        ]
+
+        joints = list(
+            self.commanded_pose
         )
 
-        if segment_count <= 0:
+        current_xyz = (
+            self.kinematics.forward_position(
+                joints
+            )
+        )
 
-            self.path_active = False
+        current_rotation = (
+            self.kinematics.forward_rotation(
+                joints
+            )
+        )
+
+        position_error = [
+
+            desired_xyz[index]
+            -
+            current_xyz[index]
+
+            for index in range(
+                3
+            )
+        ]
+
+        orientation_error = (
+            self.kinematics.orientation_error(
+                current_rotation,
+                self.upright_rotation,
+            )
+        )
+
+        position_norm = math.sqrt(
+            sum(
+                value * value
+                for value in position_error
+            )
+        )
+
+        orientation_norm = math.sqrt(
+            sum(
+                value * value
+                for value in orientation_error
+            )
+        )
+
+        # -----------------------------------------------------
+        # Final target reached.
+        # -----------------------------------------------------
+
+        if (
+            progress >= 1.0
+            and
+            position_norm
+            <=
+            self.cartesian_servo_position_tolerance
+            and
+            orientation_norm
+            <=
+            self.cartesian_servo_orientation_tolerance
+        ):
+
+            self.cartesian_active = False
 
             return True
 
-        path_position = (
-            smooth
-            *
-            segment_count
-        )
+        # -----------------------------------------------------
+        # Timeout:
+        # stop instead of hanging forever.
+        # -----------------------------------------------------
 
-        segment_index = min(
-            segment_count - 1,
-            int(
-                path_position
-            ),
-        )
+        if now >= self.cartesian_deadline:
 
-        local_fraction = (
-            path_position
-            -
-            segment_index
-        )
+            self.cartesian_active = False
 
-        start_pose = (
-            self.path_waypoints[
-                segment_index
-            ]
-        )
-
-        target_pose = (
-            self.path_waypoints[
-                segment_index
-                +
-                1
-            ]
-        )
-
-        pose = [
-
-            start_pose[index]
-            +
-            (
-                target_pose[index]
-                -
-                start_pose[index]
+            self.fail_task(
+                'CARTESIAN_SERVO_TIMEOUT: '
+                f'position_error='
+                f'{position_norm * 1000.0:.1f} mm, '
+                f'orientation_error='
+                f'{math.degrees(orientation_norm):.2f} deg'
             )
-            *
-            local_fraction
+
+            return False
+
+        try:
+
+            jacobian = (
+                self.kinematics.numerical_jacobian(
+                    joints,
+                    include_orientation=True,
+                )
+            )
+
+            error = (
+                position_error
+                +
+                orientation_error
+            )
+
+            delta = (
+                self.kinematics.damped_least_squares(
+                    jacobian,
+                    error,
+                )
+            )
+
+        except KinematicsError as error:
+
+            self.cartesian_active = False
+
+            self.fail_task(
+                'CARTESIAN_SERVO_FAILED: '
+                +
+                str(error)
+            )
+
+            return False
+
+        # -----------------------------------------------------
+        # Hard incremental joint limit.
+        #
+        # 1 degree per 50 ms = max ~20 deg/s.
+        #
+        # This is comfortably below the existing
+        # real-robot 3-degree command-step safety threshold.
+        # -----------------------------------------------------
+
+        maximum_delta = max(
+            abs(value)
+            for value in delta
+        )
+
+        if (
+            maximum_delta
+            >
+            self.cartesian_servo_joint_step
+        ):
+
+            scale = (
+                self.cartesian_servo_joint_step
+                /
+                maximum_delta
+            )
+
+            delta = [
+                value
+                *
+                scale
+                for value in delta
+            ]
+
+        next_pose = [
+
+            self.kinematics.clamp_joint(
+                joints[index]
+                +
+                delta[index],
+                index,
+            )
 
             for index in range(
                 6
             )
         ]
 
+        try:
+
+            self.kinematics.validate_joints(
+                next_pose
+            )
+
+        except JointLimitError as error:
+
+            self.cartesian_active = False
+
+            self.fail_task(
+                'CARTESIAN_SERVO_JOINT_LIMIT: '
+                +
+                str(error)
+            )
+
+            return False
+
         self.publish_joint_command(
-            pose
+            next_pose
         )
 
         self.commanded_pose = list(
-            pose
+            next_pose
         )
-
-        if progress >= 1.0:
-
-            self.commanded_pose = list(
-                self.path_waypoints[
-                    -1
-                ]
-            )
-
-            self.publish_joint_command(
-                self.commanded_pose
-            )
-
-            self.path_active = False
-
-            return True
 
         return False
 
@@ -2187,11 +2029,11 @@ class TaskManager(Node):
 
                 return
 
-        elif state_type == 'path':
+        elif state_type == 'cartesian':
 
             try:
 
-                self.start_path_motion(
+                self.start_cartesian_motion(
                     target,
                     duration,
                 )
@@ -2274,6 +2116,48 @@ class TaskManager(Node):
                 finished = (
                     self.update_motion()
                 )
+
+                if finished:
+
+                    self.hold_until = (
+                        self.now_seconds()
+                        +
+                        hold_time
+                    )
+
+                    self.get_logger().info(
+                        f'Reached: {name}'
+                    )
+
+                return
+
+            if (
+                self.now_seconds()
+                <
+                self.hold_until
+            ):
+
+                return
+
+            self.finish_state()
+
+            return
+
+        # -----------------------------------------------------
+        # Online Cartesian servo
+        # -----------------------------------------------------
+
+        if state_type == 'cartesian':
+
+            if self.cartesian_active:
+
+                finished = (
+                    self.update_cartesian_motion()
+                )
+
+                if self.task_stopped:
+
+                    return
 
                 if finished:
 
