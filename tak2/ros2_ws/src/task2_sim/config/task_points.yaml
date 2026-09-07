@@ -37,7 +37,7 @@ placement_offset_b:
   z: 0.000
 
 safe_height:
-  z: 0.150
+  z: 0.120
 motion:
   simulation_speed_scale: 0.4
   real_speed_scale: 0.2
