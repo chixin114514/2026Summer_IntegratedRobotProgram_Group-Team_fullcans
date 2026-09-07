@@ -52,7 +52,7 @@ motion:
   transfer_duration_s: 1.6
   # Cartesian path resolution for upright grasp,
   # lift, transfer and placement.
-  cartesian_path_step_m: 0.005
+  cartesian_path_step_m: 0.010
   # Hold the grasped object upright at safe height
   # before beginning horizontal transport.
   post_lift_hold_s: 0.80
