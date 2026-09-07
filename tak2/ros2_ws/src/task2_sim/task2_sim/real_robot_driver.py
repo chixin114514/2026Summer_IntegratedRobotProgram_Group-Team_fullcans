@@ -132,6 +132,14 @@ class RealRobotDriver(Node):
             )
         )
 
+
+        self.final_command_resend = float(
+            device.get(
+                'final_command_resend_s',
+                0.80,
+            )
+        )
+
         self.feedback_period = float(
             device[
                 'feedback_period_s'
@@ -161,6 +169,8 @@ class RealRobotDriver(Node):
         self.latest_arm_degrees = None
 
         self.last_sent_arm_degrees = None
+
+        self.last_arm_send_time = None
 
         self.arm_command_pending = False
 
@@ -536,6 +546,14 @@ class RealRobotDriver(Node):
         # target while waiting for measured convergence.
         # -----------------------------------------------------
 
+        now_s = (
+            self.get_clock()
+            .now()
+            .nanoseconds
+            *
+            1e-9
+        )
+
         if (
             self.last_sent_arm_degrees
             is not None
@@ -554,9 +572,32 @@ class RealRobotDriver(Node):
                 )
             )
 
+            # -------------------------------------------------
+            # Same target:
+            #
+            # Do not send at 10 Hz forever, but also do NOT
+            # suppress it permanently.
+            #
+            # Re-send every ~0.8 s while TaskManager is still
+            # requesting the final target.
+            # -------------------------------------------------
+
             if maximum_change < 0.01:
 
-                return
+                if (
+                    self.last_arm_send_time
+                    is not None
+                    and
+                    (
+                        now_s
+                        -
+                        self.last_arm_send_time
+                    )
+                    <
+                    self.final_command_resend
+                ):
+
+                    return
 
 
         try:
@@ -569,6 +610,8 @@ class RealRobotDriver(Node):
             self.last_sent_arm_degrees = list(
                 degrees
             )
+
+            self.last_arm_send_time = now_s
 
         except Exception as error:
 

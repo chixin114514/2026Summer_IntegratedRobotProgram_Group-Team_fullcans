@@ -29,6 +29,16 @@ real:
   # Real hardware state synchronisation.
   # A motion state cannot finish until measured joints
   # actually reach the target.
-  goal_tolerance_deg: 2.0
+  goal_tolerance_deg: 3.0
   goal_required_samples: 2
-  goal_timeout_s: 6.0
+  # Real-motion convergence watchdog.
+  #
+  # Keep waiting while measured error is improving.
+  # Stop only if the robot stops making progress.
+  goal_stall_timeout_s: 5.0
+  goal_absolute_timeout_s: 30.0
+  goal_progress_epsilon_deg: 0.25
+
+  # Re-send an unchanged final target occasionally.
+  # This is slow enough not to create a command queue.
+  final_command_resend_s: 0.80

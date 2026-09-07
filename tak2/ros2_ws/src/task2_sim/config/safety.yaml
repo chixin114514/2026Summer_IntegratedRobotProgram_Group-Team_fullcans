@@ -25,7 +25,7 @@ cartesian:
 motion:
   real_low_speed_required: true
   maximum_joint_step_deg_simulation: 6.5
-  maximum_joint_step_deg_real: 3.0
+  maximum_joint_step_deg_real: 6.0
 failure_policy:
   unreachable_target: safe_stop
   ik_failure: safe_stop
