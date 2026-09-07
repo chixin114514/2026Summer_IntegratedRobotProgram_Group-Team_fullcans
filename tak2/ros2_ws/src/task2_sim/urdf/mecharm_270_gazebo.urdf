@@ -339,87 +339,239 @@
 
 
   <!-- ====================================================== -->
-  <!-- Physical two-finger gripper                            -->
+  <!-- myCobot Adaptive Gripper AG                            -->
+  <!-- ====================================================== -->
+  <!-- Rotational adaptive linkage; task interface unchanged. -->
+  <!-- q_open=+0.14 rad, q_closed=-0.50 rad.                  -->
+  <!-- Effective pad span is approximately 46 mm to 20 mm.    -->
   <!-- ====================================================== -->
 
   <link name="gripper_palm">
 
     <visual>
-      <origin xyz="0 0 0.0075"/>
+      <origin xyz="0 0 0.006" rpy="0 0 0"/>
       <geometry>
-        <box size="0.078 0.026 0.015"/>
+        <box size="0.065 0.055 0.030"/>
       </geometry>
-      <material name="gripper_dark">
-        <color rgba="0.12 0.12 0.14 1"/>
+      <material name="ag_white">
+        <color rgba="0.92 0.92 0.90 1"/>
       </material>
     </visual>
 
     <collision>
-      <origin xyz="0 0 0.0075"/>
+      <origin xyz="0 0 0.006" rpy="0 0 0"/>
       <geometry>
-        <box size="0.078 0.026 0.015"/>
+        <box size="0.062 0.050 0.026"/>
       </geometry>
     </collision>
 
     <inertial>
-      <origin xyz="0 0 0.0075"/>
-      <mass value="0.05"/>
+      <origin xyz="0 0 0.006" rpy="0 0 0"/>
+      <mass value="0.090"/>
       <inertia
-        ixx="0.00008"
-        ixy="0"
-        ixz="0"
-        iyy="0.00008"
-        iyz="0"
-        izz="0.00008"/>
+        ixx="0.00010" ixy="0" ixz="0"
+        iyy="0.00010" iyz="0"
+        izz="0.00010"/>
     </inertial>
 
   </link>
 
-
-  <!-- Mount palm on joint 6 -->
 
   <joint name="gripper_mount" type="fixed">
-
     <parent link="link6"/>
     <child link="gripper_palm"/>
-
-    <origin
-      xyz="0 0 0.005"
-      rpy="0 0 0"/>
-
+    <origin xyz="0 0 0.005" rpy="0 0 0"/>
   </joint>
 
 
-  <!-- ====================================================== -->
-  <!-- Left finger                                            -->
-  <!-- ====================================================== -->
+  <!-- LEFT linkage -->
 
-  <link name="left_finger">
+  <link name="gripper_left3">
 
     <visual>
-      <origin xyz="0 0 0.0275"/>
+      <origin xyz="-0.0135 0 0.0080" rpy="0 -1.036 0"/>
       <geometry>
-        <box size="0.008 0.014 0.055"/>
+        <box size="0.008 0.010 0.0315"/>
       </geometry>
-      <material name="gripper_dark"/>
+      <material name="ag_white"/>
     </visual>
 
     <collision>
-      <origin xyz="0 0 0.0275"/>
+      <origin xyz="-0.0135 0 0.0080" rpy="0 -1.036 0"/>
       <geometry>
-        <box size="0.008 0.014 0.055"/>
+        <box size="0.008 0.010 0.0315"/>
       </geometry>
     </collision>
 
     <inertial>
-      <origin xyz="0 0 0.0275"/>
-      <mass value="0.025"/>
+      <origin xyz="-0.0135 0 0.0080" rpy="0 0 0"/>
+      <mass value="0.012"/>
       <inertia
-        ixx="0.00002"
-        ixy="0"
-        ixz="0"
-        iyy="0.00002"
-        iyz="0"
+        ixx="0.00001" ixy="0" ixz="0"
+        iyy="0.00001" iyz="0"
+        izz="0.00001"/>
+    </inertial>
+
+  </link>
+
+
+  <joint name="gripper_controller" type="revolute">
+
+    <parent link="gripper_palm"/>
+    <child link="gripper_left3"/>
+
+    <axis xyz="0 -1 0"/>
+
+    <origin xyz="-0.012 0 0.005" rpy="0 0 0"/>
+
+    <limit
+      effort="8.0"
+      lower="-0.70"
+      upper="0.15"
+      velocity="1.2"/>
+
+    <dynamics damping="0.20" friction="0.05"/>
+
+  </joint>
+
+
+  <link name="gripper_left1">
+
+    <visual>
+      <origin xyz="0.013 0 0.022" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.016 0.022 0.034"/>
+      </geometry>
+      <material name="ag_white"/>
+    </visual>
+
+    <visual>
+      <origin xyz="0.019 0 0.022" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.004 0.024 0.030"/>
+      </geometry>
+      <material name="ag_dark">
+        <color rgba="0.10 0.10 0.11 1"/>
+      </material>
+    </visual>
+
+    <collision>
+      <origin xyz="0.013 0 0.022" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.010 0.022 0.030"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <origin xyz="0.013 0 0.022" rpy="0 0 0"/>
+      <mass value="0.018"/>
+      <inertia
+        ixx="0.000015" ixy="0" ixz="0"
+        iyy="0.000015" iyz="0"
+        izz="0.000010"/>
+    </inertial>
+
+  </link>
+
+
+  <joint
+    name="gripper_left3_to_gripper_left1"
+    type="revolute">
+
+    <parent link="gripper_left3"/>
+    <child link="gripper_left1"/>
+
+    <axis xyz="0 -1 0"/>
+
+    <origin xyz="-0.027 0 0.016" rpy="0 0 0"/>
+
+    <limit
+      effort="8.0"
+      lower="-0.50"
+      upper="0.50"
+      velocity="1.2"/>
+
+    <dynamics damping="0.20" friction="0.05"/>
+
+  </joint>
+
+
+  <link name="gripper_left2">
+
+    <visual>
+      <origin xyz="-0.015 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.030 0.008 0.008"/>
+      </geometry>
+      <material name="ag_white"/>
+    </visual>
+
+    <collision>
+      <origin xyz="-0.015 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.030 0.008 0.008"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <origin xyz="-0.015 0 0" rpy="0 0 0"/>
+      <mass value="0.010"/>
+      <inertia
+        ixx="0.000008" ixy="0" ixz="0"
+        iyy="0.000008" iyz="0"
+        izz="0.000008"/>
+    </inertial>
+
+  </link>
+
+
+  <joint
+    name="gripper_base_to_gripper_left2"
+    type="revolute">
+
+    <parent link="gripper_palm"/>
+    <child link="gripper_left2"/>
+
+    <axis xyz="0 -1 0"/>
+
+    <origin xyz="-0.005 0 0.027" rpy="0 0 0"/>
+
+    <limit
+      effort="8.0"
+      lower="-0.80"
+      upper="0.50"
+      velocity="1.2"/>
+
+    <dynamics damping="0.20" friction="0.05"/>
+
+  </joint>
+
+
+  <!-- RIGHT linkage -->
+
+  <link name="gripper_right3">
+
+    <visual>
+      <origin xyz="0.0135 0 0.0080" rpy="0 1.036 0"/>
+      <geometry>
+        <box size="0.008 0.010 0.0315"/>
+      </geometry>
+      <material name="ag_white"/>
+    </visual>
+
+    <collision>
+      <origin xyz="0.0135 0 0.0080" rpy="0 1.036 0"/>
+      <geometry>
+        <box size="0.008 0.010 0.0315"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <origin xyz="0.0135 0 0.0080" rpy="0 0 0"/>
+      <mass value="0.012"/>
+      <inertia
+        ixx="0.00001" ixy="0" ixz="0"
+        iyy="0.00001" iyz="0"
         izz="0.00001"/>
     </inertial>
 
@@ -427,155 +579,213 @@
 
 
   <joint
-    name="left_finger_joint"
-    type="prismatic">
+    name="gripper_base_to_gripper_right3"
+    type="revolute">
 
     <parent link="gripper_palm"/>
-    <child link="left_finger"/>
+    <child link="gripper_right3"/>
 
-    <origin
-      xyz="0.0265 0 0.015"
-      rpy="0 0 0"/>
+    <axis xyz="0 -1 0"/>
 
-    <!-- Positive motion moves toward centre -->
-    <axis xyz="-1 0 0"/>
+    <origin xyz="0.012 0 0.005" rpy="0 0 0"/>
 
     <limit
-      lower="0.0"
-      upper="0.0125"
-      effort="60"
-      velocity="0.04"/>
+      effort="8.0"
+      lower="-0.15"
+      upper="0.70"
+      velocity="1.2"/>
 
-    <dynamics
-      damping="1.0"
-      friction="0.5"/>
+    <dynamics damping="0.20" friction="0.05"/>
 
   </joint>
 
 
-  <!-- ====================================================== -->
-  <!-- Right finger                                           -->
-  <!-- ====================================================== -->
-
-  <link name="right_finger">
+  <link name="gripper_right1">
 
     <visual>
-      <origin xyz="0 0 0.0275"/>
+      <origin xyz="-0.013 0 0.022" rpy="0 0 0"/>
       <geometry>
-        <box size="0.008 0.014 0.055"/>
+        <box size="0.016 0.022 0.034"/>
       </geometry>
-      <material name="gripper_dark"/>
+      <material name="ag_white"/>
+    </visual>
+
+    <visual>
+      <origin xyz="-0.019 0 0.022" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.004 0.024 0.030"/>
+      </geometry>
+      <material name="ag_dark"/>
     </visual>
 
     <collision>
-      <origin xyz="0 0 0.0275"/>
+      <origin xyz="-0.013 0 0.022" rpy="0 0 0"/>
       <geometry>
-        <box size="0.008 0.014 0.055"/>
+        <box size="0.010 0.022 0.030"/>
       </geometry>
     </collision>
 
     <inertial>
-      <origin xyz="0 0 0.0275"/>
-      <mass value="0.025"/>
+      <origin xyz="-0.013 0 0.022" rpy="0 0 0"/>
+      <mass value="0.018"/>
       <inertia
-        ixx="0.00002"
-        ixy="0"
-        ixz="0"
-        iyy="0.00002"
-        iyz="0"
-        izz="0.00001"/>
+        ixx="0.000015" ixy="0" ixz="0"
+        iyy="0.000015" iyz="0"
+        izz="0.000010"/>
     </inertial>
 
   </link>
 
 
   <joint
-    name="right_finger_joint"
-    type="prismatic">
+    name="gripper_right3_to_gripper_right1"
+    type="revolute">
 
-    <parent link="gripper_palm"/>
-    <child link="right_finger"/>
+    <parent link="gripper_right3"/>
+    <child link="gripper_right1"/>
 
-    <origin
-      xyz="-0.0265 0 0.015"
-      rpy="0 0 0"/>
+    <axis xyz="0 -1 0"/>
 
-    <!-- Positive motion moves toward centre -->
-    <axis xyz="1 0 0"/>
+    <origin xyz="0.027 0 0.016" rpy="0 0 0"/>
 
     <limit
-      lower="0.0"
-      upper="0.0125"
-      effort="60"
-      velocity="0.04"/>
+      effort="8.0"
+      lower="-0.50"
+      upper="0.50"
+      velocity="1.2"/>
 
-    <dynamics
-      damping="1.0"
-      friction="0.5"/>
+    <dynamics damping="0.20" friction="0.05"/>
 
   </joint>
 
 
-  <!-- ====================================================== -->
-  <!-- Finger position controllers                            -->
-  <!-- ====================================================== -->
+  <link name="gripper_right2">
+
+    <visual>
+      <origin xyz="0.015 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.030 0.008 0.008"/>
+      </geometry>
+      <material name="ag_white"/>
+    </visual>
+
+    <collision>
+      <origin xyz="0.015 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.030 0.008 0.008"/>
+      </geometry>
+    </collision>
+
+    <inertial>
+      <origin xyz="0.015 0 0" rpy="0 0 0"/>
+      <mass value="0.010"/>
+      <inertia
+        ixx="0.000008" ixy="0" ixz="0"
+        iyy="0.000008" iyz="0"
+        izz="0.000008"/>
+    </inertial>
+
+  </link>
+
+
+  <joint
+    name="gripper_base_to_gripper_right2"
+    type="revolute">
+
+    <parent link="gripper_palm"/>
+    <child link="gripper_right2"/>
+
+    <axis xyz="0 -1 0"/>
+
+    <origin xyz="0.005 0 0.027" rpy="0 0 0"/>
+
+    <limit
+      effort="8.0"
+      lower="-0.50"
+      upper="0.80"
+      velocity="1.2"/>
+
+    <dynamics damping="0.20" friction="0.05"/>
+
+  </joint>
+
+
+  <!-- Gazebo linkage position controllers -->
 
   <gazebo>
 
     <plugin
       filename="ignition-gazebo-joint-position-controller-system"
       name="ignition::gazebo::systems::JointPositionController">
-
-      <joint_name>
-        left_finger_joint
-      </joint_name>
-
-      <topic>
-        /task2/gripper/left_cmd_pos
-      </topic>
-
-      <p_gain>250.0</p_gain>
+      <joint_name>gripper_controller</joint_name>
+      <topic>/task2/gripper/left3_cmd_pos</topic>
+      <p_gain>18.0</p_gain>
       <i_gain>0.0</i_gain>
-      <d_gain>8.0</d_gain>
-
-      <initial_position>0.0</initial_position>
-
+      <d_gain>0.8</d_gain>
+      <initial_position>0.14</initial_position>
     </plugin>
-
 
     <plugin
       filename="ignition-gazebo-joint-position-controller-system"
       name="ignition::gazebo::systems::JointPositionController">
-
-      <joint_name>
-        right_finger_joint
-      </joint_name>
-
-      <topic>
-        /task2/gripper/right_cmd_pos
-      </topic>
-
-      <p_gain>250.0</p_gain>
+      <joint_name>gripper_base_to_gripper_left2</joint_name>
+      <topic>/task2/gripper/left2_cmd_pos</topic>
+      <p_gain>18.0</p_gain>
       <i_gain>0.0</i_gain>
-      <d_gain>8.0</d_gain>
+      <d_gain>0.8</d_gain>
+      <initial_position>0.14</initial_position>
+    </plugin>
 
-      <initial_position>0.0</initial_position>
+    <plugin
+      filename="ignition-gazebo-joint-position-controller-system"
+      name="ignition::gazebo::systems::JointPositionController">
+      <joint_name>gripper_left3_to_gripper_left1</joint_name>
+      <topic>/task2/gripper/left1_cmd_pos</topic>
+      <p_gain>18.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>0.8</d_gain>
+      <initial_position>-0.14</initial_position>
+    </plugin>
 
+    <plugin
+      filename="ignition-gazebo-joint-position-controller-system"
+      name="ignition::gazebo::systems::JointPositionController">
+      <joint_name>gripper_base_to_gripper_right3</joint_name>
+      <topic>/task2/gripper/right3_cmd_pos</topic>
+      <p_gain>18.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>0.8</d_gain>
+      <initial_position>-0.14</initial_position>
+    </plugin>
+
+    <plugin
+      filename="ignition-gazebo-joint-position-controller-system"
+      name="ignition::gazebo::systems::JointPositionController">
+      <joint_name>gripper_base_to_gripper_right2</joint_name>
+      <topic>/task2/gripper/right2_cmd_pos</topic>
+      <p_gain>18.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>0.8</d_gain>
+      <initial_position>-0.14</initial_position>
+    </plugin>
+
+    <plugin
+      filename="ignition-gazebo-joint-position-controller-system"
+      name="ignition::gazebo::systems::JointPositionController">
+      <joint_name>gripper_right3_to_gripper_right1</joint_name>
+      <topic>/task2/gripper/right1_cmd_pos</topic>
+      <p_gain>18.0</p_gain>
+      <i_gain>0.0</i_gain>
+      <d_gain>0.8</d_gain>
+      <initial_position>0.14</initial_position>
     </plugin>
 
   </gazebo>
 
 
-  <!-- ====================================================== -->
-  
+  <!-- Rubber-like contact pads -->
 
-
-
-
-
-  <!-- High-friction rubber-like finger surfaces -->
-
-  <gazebo reference="left_finger">
+  <gazebo reference="gripper_left1">
     <mu1>4.0</mu1>
     <mu2>4.0</mu2>
     <kp>1000000.0</kp>
@@ -584,7 +794,7 @@
     <maxVel>0.02</maxVel>
   </gazebo>
 
-  <gazebo reference="right_finger">
+  <gazebo reference="gripper_right1">
     <mu1>4.0</mu1>
     <mu2>4.0</mu2>
     <kp>1000000.0</kp>

@@ -49,6 +49,10 @@ motion:
 gripper:
   open_position: 0.0
   closed_position: 0.0120
+  # Gazebo adaptive-linkage angles. Task-level open/close
+  # commands remain unchanged for sim/real compatibility.
+  simulation_open_angle_rad: 0.14
+  simulation_closed_angle_rad: -0.50
   close_duration_s: 0.65
   open_duration_s: 0.55
 experiment:

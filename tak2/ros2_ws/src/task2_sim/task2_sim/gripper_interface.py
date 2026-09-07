@@ -1,16 +1,10 @@
 import rclpy
 
-from ament_index_python.packages import (
-    get_package_share_directory,
-)
-
+from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
-
 from std_msgs.msg import Float64
 
-from task2_sim.runtime_config import (
-    Task2Config,
-)
+from task2_sim.runtime_config import Task2Config
 
 
 class GripperInterface(Node):
@@ -49,13 +43,8 @@ class GripperInterface(Node):
             )
         )
 
-        self.left_pub = None
-        self.right_pub = None
+        self.sim_pubs = {}
         self.real_pub = None
-
-        # -----------------------------------------------------
-        # Simulation physical fingers
-        # -----------------------------------------------------
 
         if self.config.is_simulation:
 
@@ -65,34 +54,75 @@ class GripperInterface(Node):
                 ]
             )
 
-            self.left_pub = (
-                self.create_publisher(
-                    Float64,
-                    simulation[
-                        'gripper_left_topic'
-                    ],
-                    10,
+            topic_keys = {
+                'left3':
+                    'gripper_left3_topic',
+                'left2':
+                    'gripper_left2_topic',
+                'left1':
+                    'gripper_left1_topic',
+                'right3':
+                    'gripper_right3_topic',
+                'right2':
+                    'gripper_right2_topic',
+                'right1':
+                    'gripper_right1_topic',
+            }
+
+            for joint_name, key in (
+                topic_keys.items()
+            ):
+
+                self.sim_pubs[
+                    joint_name
+                ] = (
+                    self.create_publisher(
+                        Float64,
+                        simulation[key],
+                        10,
+                    )
                 )
+
+            task_gripper = (
+                self.config.task[
+                    'gripper'
+                ]
             )
 
-            self.right_pub = (
-                self.create_publisher(
-                    Float64,
-                    simulation[
-                        'gripper_right_topic'
-                    ],
-                    10,
-                )
+            self.open_position = float(
+                task_gripper[
+                    'open_position'
+                ]
+            )
+
+            self.closed_position = float(
+                task_gripper[
+                    'closed_position'
+                ]
+            )
+
+            self.sim_open_angle = float(
+                task_gripper[
+                    'simulation_open_angle_rad'
+                ]
+            )
+
+            self.sim_closed_angle = float(
+                task_gripper[
+                    'simulation_closed_angle_rad'
+                ]
             )
 
             self.get_logger().info(
                 'GRIPPER BACKEND = '
-                'GAZEBO PHYSICAL FINGERS'
+                'GAZEBO ADAPTIVE LINKAGE'
             )
 
-        # -----------------------------------------------------
-        # Real gripper adapter
-        # -----------------------------------------------------
+            self.get_logger().info(
+                'Adaptive gripper angles: '
+                f'open={self.sim_open_angle:.3f} rad, '
+                f'closed={self.sim_closed_angle:.3f} rad'
+            )
 
         else:
 
@@ -114,7 +144,7 @@ class GripperInterface(Node):
 
             self.get_logger().info(
                 'GRIPPER BACKEND = '
-                'REAL MECHARM GRIPPER'
+                'REAL MYCOBOT ADAPTIVE GRIPPER AG'
             )
 
     def command_callback(
@@ -128,24 +158,66 @@ class GripperInterface(Node):
 
         if self.config.is_simulation:
 
-            left = Float64()
-            right = Float64()
-
-            left.data = value
-            right.data = value
-
-            self.left_pub.publish(
-                left
+            span = max(
+                1e-6,
+                self.closed_position
+                -
+                self.open_position,
             )
 
-            self.right_pub.publish(
-                right
+            closed_fraction = (
+                value
+                -
+                self.open_position
+            ) / span
+
+            closed_fraction = max(
+                0.0,
+                min(
+                    1.0,
+                    closed_fraction,
+                ),
             )
+
+            q = (
+                self.sim_open_angle
+                +
+                closed_fraction
+                *
+                (
+                    self.sim_closed_angle
+                    -
+                    self.sim_open_angle
+                )
+            )
+
+            commands = {
+                'left3': q,
+                'left2': q,
+                'left1': -q,
+                'right3': -q,
+                'right2': -q,
+                'right1': q,
+            }
+
+            for joint_name, command in (
+                commands.items()
+            ):
+
+                output = Float64()
+                output.data = float(
+                    command
+                )
+
+                self.sim_pubs[
+                    joint_name
+                ].publish(
+                    output
+                )
 
         else:
 
             output = Float64()
-
             output.data = value
 
             self.real_pub.publish(
@@ -174,7 +246,6 @@ def main(args=None):
     finally:
 
         node.destroy_node()
-
         rclpy.shutdown()
 
 

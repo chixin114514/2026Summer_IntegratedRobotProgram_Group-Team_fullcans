@@ -290,20 +290,37 @@ def generate_launch_description():
                 )
             )
 
-        bridge_arguments.extend([
+        gripper_topic_keys = [
 
-            (
-                '/task2/gripper/left_cmd_pos'
-                '@std_msgs/msg/Float64'
-                ']ignition.msgs.Double'
-            ),
+            'gripper_left3_topic',
+            'gripper_left2_topic',
+            'gripper_left1_topic',
+            'gripper_right3_topic',
+            'gripper_right2_topic',
+            'gripper_right1_topic',
+        ]
 
-            (
-                '/task2/gripper/right_cmd_pos'
-                '@std_msgs/msg/Float64'
-                ']ignition.msgs.Double'
-            ),
-        ])
+        for key in gripper_topic_keys:
+
+            topic = (
+                communication[
+                    'simulation'
+                ][
+                    key
+                ]
+            )
+
+            bridge_arguments.append(
+
+                (
+                    topic
+                    +
+                    '@std_msgs/msg/Float64'
+                    +
+                    ']ignition.msgs.Double'
+                )
+            )
+
 
         bridge = Node(
 
