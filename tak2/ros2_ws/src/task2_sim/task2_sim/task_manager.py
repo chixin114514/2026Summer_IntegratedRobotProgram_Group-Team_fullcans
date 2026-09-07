@@ -412,6 +412,20 @@ class TaskManager(Node):
             )
         )
 
+        self.a_safe_hold = float(
+            motion.get(
+                'a_safe_hold_s',
+                0.80,
+            )
+        )
+
+        self.pregrasp_hold = float(
+            motion.get(
+                'pregrasp_hold_s',
+                0.60,
+            )
+        )
+
         gripper = (
             task[
                 'gripper'
@@ -597,18 +611,28 @@ class TaskManager(Node):
                 'motion',
                 self.a_safe,
                 self.approach_duration,
-                0.20,
+
+                # Reach the final upright pose above A,
+                # then remain completely still.
+                self.a_safe_hold,
             ),
 
             (
                 'A_PREGRASP',
-                'cartesian',
-                self.a_pregrasp_xyz,
 
-                # Move into final wrist orientation while
-                # still safely above the cube.
-                1.00,
-                0.15,
+                # Stationary pre-grasp settling state.
+                #
+                # Same pose as A_SAFE:
+                # no X/Y/Z movement and no wrist movement.
+                'motion',
+                self.a_safe,
+
+                # start_motion has a 0.5 s minimum duration.
+                # Since start == target, the robot simply
+                # keeps receiving the same hold pose.
+                0.50,
+
+                self.pregrasp_hold,
             ),
 
             (
@@ -931,14 +955,17 @@ class TaskManager(Node):
         # while still well above the cube.  The final approach
         # is therefore a short downward motion instead of a
         # long joint-space sweep beside the object.
-        a_pregrasp_xyz = [
+        # -----------------------------------------------------
+        # A_PREGRASP is intentionally stationary.
+        #
+        # It uses exactly the A_SAFE Cartesian position.
+        # The robot settles here before the ONE final vertical
+        # descent performed by A_PICK.
+        # -----------------------------------------------------
 
-            self.a_grasp_target[0],
-
-            self.a_grasp_target[1],
-
-            0.095,
-        ]
+        a_pregrasp_xyz = list(
+            a_safe_xyz
+        )
 
         # =====================================================
         # B placement compensation
