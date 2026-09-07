@@ -158,6 +158,14 @@ class RealRobotDriver(Node):
 
         self.consecutive_feedback_errors = 0
 
+        # MechArmSocket / pymycobot may occasionally return
+        # an integer sentinel such as -1 instead of a six-angle
+        # list when a feedback response is not ready.
+        #
+        # This is NOT immediately considered a communication
+        # failure. The sample is simply discarded.
+        self.invalid_feedback_samples = 0
+
         # -----------------------------------------------------
         # Latest-command buffer.
         #
@@ -724,63 +732,33 @@ class RealRobotDriver(Node):
 
             return
 
+
+        # =====================================================
+        # Read raw pymycobot feedback
+        # =====================================================
+
         try:
 
             angles = (
                 self.robot.get_angles()
             )
 
-            if (
-                angles is None
-                or
-                len(angles) != 6
-            ):
-
-                raise RuntimeError(
-                    'Invalid angle feedback.'
-                )
-
-            message = JointState()
-
-            message.header.stamp = (
-                self.get_clock()
-                .now()
-                .to_msg()
-            )
-
-            message.name = [
-
-                'joint1_to_base',
-                'joint2_to_joint1',
-                'joint3_to_joint2',
-                'joint4_to_joint3',
-                'joint5_to_joint4',
-                'joint6_to_joint5',
-            ]
-
-            message.position = [
-                math.radians(
-                    float(value)
-                )
-                for value in angles
-            ]
-
-            self.joint_state_pub.publish(
-                message
-            )
-
-            self.consecutive_feedback_errors = 0
-
-            self.publish_connection(
-                'CONNECTED'
-            )
-
         except Exception as error:
+
+            # -------------------------------------------------
+            # A real socket / transport exception.
+            # -------------------------------------------------
 
             self.consecutive_feedback_errors += 1
 
             self.publish_connection(
                 'FEEDBACK_ERROR'
+            )
+
+            self.get_logger().warn(
+                'REAL_FEEDBACK_EXCEPTION: '
+                +
+                str(error)
             )
 
             if (
@@ -794,6 +772,167 @@ class RealRobotDriver(Node):
                     +
                     str(error)
                 )
+
+            return
+
+
+        # =====================================================
+        # IMPORTANT FIX
+        #
+        # pymycobot may return:
+        #
+        #     -1
+        #
+        # or another non-list sentinel when a reply is not
+        # available yet.
+        #
+        # NEVER call len() before checking the type.
+        # =====================================================
+
+        if not isinstance(
+            angles,
+            (
+                list,
+                tuple,
+            ),
+        ):
+
+            self.invalid_feedback_samples += 1
+
+            self.publish_connection(
+                'FEEDBACK_WAIT'
+            )
+
+            # Avoid flooding the terminal.
+            if (
+                self.invalid_feedback_samples == 1
+                or
+                self.invalid_feedback_samples == 5
+                or
+                self.invalid_feedback_samples % 10 == 0
+            ):
+
+                self.get_logger().warn(
+                    'REAL_FEEDBACK_WAIT: '
+                    f'non-list feedback={angles!r} '
+                    f'samples={self.invalid_feedback_samples}'
+                )
+
+            # This sample is simply unavailable.
+            #
+            # Do NOT SAFE_STOP here.
+            # TaskManager has its own measured-feedback
+            # progress / stall watchdog.
+            return
+
+
+        # =====================================================
+        # Sequence must contain exactly six joints
+        # =====================================================
+
+        if len(
+            angles
+        ) != 6:
+
+            self.invalid_feedback_samples += 1
+
+            self.publish_connection(
+                'FEEDBACK_WAIT'
+            )
+
+            self.get_logger().warn(
+                'REAL_FEEDBACK_WAIT: '
+                f'invalid feedback length='
+                f'{len(angles)} '
+                f'raw={angles!r}'
+            )
+
+            return
+
+
+        # =====================================================
+        # Validate every returned angle
+        # =====================================================
+
+        try:
+
+            angle_values = [
+                float(value)
+                for value in angles
+            ]
+
+        except (
+            TypeError,
+            ValueError,
+        ) as error:
+
+            self.invalid_feedback_samples += 1
+
+            self.publish_connection(
+                'FEEDBACK_WAIT'
+            )
+
+            self.get_logger().warn(
+                'REAL_FEEDBACK_WAIT: '
+                f'non-numeric feedback='
+                f'{angles!r}: {error}'
+            )
+
+            return
+
+
+        # =====================================================
+        # Valid feedback
+        # =====================================================
+
+        message = JointState()
+
+        message.header.stamp = (
+            self.get_clock()
+            .now()
+            .to_msg()
+        )
+
+        message.name = [
+
+            'joint1_to_base',
+            'joint2_to_joint1',
+            'joint3_to_joint2',
+            'joint4_to_joint3',
+            'joint5_to_joint4',
+            'joint6_to_joint5',
+        ]
+
+        message.position = [
+
+            math.radians(
+                value
+            )
+
+            for value in angle_values
+        ]
+
+        self.joint_state_pub.publish(
+            message
+        )
+
+        # Successful feedback clears BOTH kinds of error state.
+
+        if self.invalid_feedback_samples > 0:
+
+            self.get_logger().info(
+                'REAL_FEEDBACK_RECOVERED: '
+                f'angles={['%.1f' % value for value in angle_values]}'
+            )
+
+        self.invalid_feedback_samples = 0
+
+        self.consecutive_feedback_errors = 0
+
+        self.publish_connection(
+            'CONNECTED'
+        )
+
 
     # ========================================================
     # Emergency stop
