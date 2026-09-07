@@ -11,10 +11,11 @@ point_a:
   y: 0.085
   z: 0.038
 grasp_offset_a:
-  # Upright workspace calibration.
-  x: 0.000
+  # Strict-upright pickup calibration.
+  # Physical object A remains fixed.
+  x: 0.010
   y: 0.000
-  z: 0.000
+  z: -0.018
 
 point_b:
   x: 0.143
@@ -26,7 +27,7 @@ placement_offset_b:
   z: 0.000
 
 safe_height:
-  z: 0.115
+  z: 0.100
 motion:
   simulation_speed_scale: 0.4
   real_speed_scale: 0.2
@@ -86,12 +87,12 @@ kinematics:
 
   # Initial IK seed at A_PICK.
   pick_seed_deg:
-  - 22.9584
-  - 61.3721
-  - -53.6191
-  - 17.5440
-  - 67.3769
-  - 18.2891
+  - 30.3791
+  - 42.9395
+  - -17.8844
+  - 0.0000
+  - 64.9449
+  - 30.3791
 
   # Initial IK seed at B_PLACE.
   place_seed_deg:
@@ -110,28 +111,28 @@ kinematics:
   upright_seed_deg:
 
     a_pick:
-    - 32.1957
-    - 34.3556
-    - -14.1804
+    - 30.3791
+    - 42.9395
+    - -17.8844
     - 0.0000
-    - 69.8248
-    - 32.1957
+    - 64.9449
+    - 30.3791
 
     a_pregrasp:
-    - 32.1957
-    - 30.9453
-    - -28.9486
+    - 30.3791
+    - 37.0453
+    - -30.2489
     - 0.0000
-    - 88.0033
-    - 32.1957
+    - 83.2036
+    - 30.3791
 
     a_safe:
-    - 32.1957
-    - 39.4726
-    - -64.2532
+    - 30.3791
+    - 41.8030
+    - -59.4222
     - 0.0000
-    - 114.7806
-    - 32.1957
+    - 107.6192
+    - 30.3791
 
     b_safe:
     - -26.7251
