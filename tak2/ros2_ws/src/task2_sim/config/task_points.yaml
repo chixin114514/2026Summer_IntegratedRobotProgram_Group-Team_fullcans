@@ -50,6 +50,9 @@ motion:
   descend_duration_s: 0.9
   lift_duration_s: 1.0
   transfer_duration_s: 1.6
+  # Cartesian path resolution for upright grasp,
+  # lift, transfer and placement.
+  cartesian_path_step_m: 0.005
 gripper:
   open_position: 0.0
   closed_position: 0.0120

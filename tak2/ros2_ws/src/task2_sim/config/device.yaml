@@ -1,4 +1,4 @@
-mode: 1
+mode: 0
 robot:
   name: mecharm_270_pi
   dof: 6

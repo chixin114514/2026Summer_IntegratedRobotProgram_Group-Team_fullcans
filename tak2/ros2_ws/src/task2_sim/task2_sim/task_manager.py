@@ -365,6 +365,13 @@ class TaskManager(Node):
             ]
         )
 
+        self.cartesian_path_step = float(
+            motion.get(
+                'cartesian_path_step_m',
+                0.005,
+            )
+        )
+
         gripper = (
             task[
                 'gripper'
@@ -461,6 +468,23 @@ class TaskManager(Node):
 
         self.motion_duration = 1.0
 
+        # -----------------------------------------------------
+        # Dense Cartesian-path execution.
+        #
+        # Joint interpolation is still used only between two
+        # neighbouring IK samples. Because those samples are
+        # only ~5 mm apart and all have exactly the same tool
+        # rotation, the gripper remains effectively upright.
+        # -----------------------------------------------------
+
+        self.path_active = False
+
+        self.path_waypoints = []
+
+        self.path_start_time = 0.0
+
+        self.path_duration = 1.0
+
         self.hold_until = 0.0
 
         # ====================================================
@@ -531,8 +555,8 @@ class TaskManager(Node):
 
             (
                 'A_PREGRASP',
-                'motion',
-                self.a_pregrasp,
+                'path',
+                self.path_a_pregrasp,
 
                 # Move into final wrist orientation while
                 # still safely above the cube.
@@ -542,8 +566,8 @@ class TaskManager(Node):
 
             (
                 'A_PICK',
-                'motion',
-                self.a_pick,
+                'path',
+                self.path_a_pick,
 
                 # Slow final insertion, matching the
                 # low-speed real-robot demonstration.
@@ -561,24 +585,24 @@ class TaskManager(Node):
 
             (
                 'A_LIFT',
-                'motion',
-                self.a_safe,
+                'path',
+                self.path_a_lift,
                 self.lift_duration,
                 0.20,
             ),
 
             (
                 'B_SAFE',
-                'motion',
-                self.b_safe,
+                'path',
+                self.path_b_safe,
                 self.transfer_duration,
                 0.20,
             ),
 
             (
                 'B_PLACE',
-                'motion',
-                self.b_place,
+                'path',
+                self.path_b_place,
                 self.descend_duration,
 
                 # Let the cube settle on the table before
@@ -613,8 +637,8 @@ class TaskManager(Node):
 
             (
                 'B_LIFT',
-                'motion',
-                self.b_safe,
+                'path',
+                self.path_b_lift,
                 self.lift_duration,
                 0.20,
             ),
@@ -976,6 +1000,308 @@ class TaskManager(Node):
         )
 
 
+        # =====================================================
+        # Dense upright Cartesian paths
+        #
+        # IMPORTANT:
+        #
+        # The old controller only constrained orientation at
+        # the END of each motion state. Between endpoints it
+        # interpolated J1-J6 directly, so the tool could tilt.
+        #
+        # We now generate small Cartesian samples. Every sample
+        # uses exactly transport_rotation:
+        #
+        #   tool vertical
+        #   gripper edges parallel to cube edges
+        #   held cube level with table
+        #
+        # High-level task states are unchanged.
+        # =====================================================
+
+        def build_cartesian_path(
+            start_xyz,
+            end_xyz,
+            start_pose,
+        ):
+
+            dx = (
+                end_xyz[0]
+                -
+                start_xyz[0]
+            )
+
+            dy = (
+                end_xyz[1]
+                -
+                start_xyz[1]
+            )
+
+            dz = (
+                end_xyz[2]
+                -
+                start_xyz[2]
+            )
+
+            distance = math.sqrt(
+                dx * dx
+                +
+                dy * dy
+                +
+                dz * dz
+            )
+
+            segment_count = max(
+                1,
+                int(
+                    math.ceil(
+                        distance
+                        /
+                        max(
+                            0.001,
+                            self.cartesian_path_step,
+                        )
+                    )
+                ),
+            )
+
+            path = [
+                list(
+                    start_pose
+                )
+            ]
+
+            seed = list(
+                start_pose
+            )
+
+            for step_index in range(
+                1,
+                segment_count + 1,
+            ):
+
+                fraction = (
+                    step_index
+                    /
+                    segment_count
+                )
+
+                xyz = [
+
+                    start_xyz[0]
+                    +
+                    dx
+                    *
+                    fraction,
+
+                    start_xyz[1]
+                    +
+                    dy
+                    *
+                    fraction,
+
+                    start_xyz[2]
+                    +
+                    dz
+                    *
+                    fraction,
+                ]
+
+                seed = (
+                    self.kinematics.solve_pose(
+                        xyz,
+                        transport_rotation,
+                        seed,
+                        position_tolerance=0.006,
+                    )
+                )
+
+                path.append(
+                    list(
+                        seed
+                    )
+                )
+
+            return path
+
+
+        # -----------------------------------------------------
+        # A_SAFE -> A_PREGRASP
+        #
+        # X/Y fixed.
+        # Only Z decreases.
+        # Tool orientation is fixed upright.
+        # -----------------------------------------------------
+
+        self.path_a_pregrasp = (
+            build_cartesian_path(
+                a_safe_xyz,
+                a_pregrasp_xyz,
+                self.a_safe,
+            )
+        )
+
+        self.a_pregrasp = list(
+            self.path_a_pregrasp[
+                -1
+            ]
+        )
+
+
+        # -----------------------------------------------------
+        # A_PREGRASP -> A_PICK
+        #
+        # Final vertical insertion.
+        # -----------------------------------------------------
+
+        self.path_a_pick = (
+            build_cartesian_path(
+                a_pregrasp_xyz,
+                self.a_grasp_target,
+                self.a_pregrasp,
+            )
+        )
+
+        self.a_pick = list(
+            self.path_a_pick[
+                -1
+            ]
+        )
+
+
+        # -----------------------------------------------------
+        # A_PICK -> A_SAFE
+        #
+        # EXACT reverse of the downward Cartesian grasp path.
+        #
+        # The held cube therefore rises vertically instead of
+        # being swept sideways.
+        # -----------------------------------------------------
+
+        full_a_down_path = (
+            self.path_a_pregrasp
+            +
+            self.path_a_pick[
+                1:
+            ]
+        )
+
+        self.path_a_lift = [
+            list(pose)
+            for pose in reversed(
+                full_a_down_path
+            )
+        ]
+
+
+        # -----------------------------------------------------
+        # A_SAFE -> B_SAFE
+        #
+        # Constant Z.
+        # Constant upright rotation.
+        #
+        # This is the horizontal level transport.
+        # -----------------------------------------------------
+
+        self.path_b_safe = (
+            build_cartesian_path(
+                a_safe_xyz,
+                b_safe_xyz,
+                self.a_safe,
+            )
+        )
+
+        self.b_safe = list(
+            self.path_b_safe[
+                -1
+            ]
+        )
+
+
+        # -----------------------------------------------------
+        # B_SAFE -> B_PLACE
+        #
+        # Vertical placement only.
+        # -----------------------------------------------------
+
+        self.path_b_place = (
+            build_cartesian_path(
+                b_safe_xyz,
+                self.b_release_target,
+                self.b_safe,
+            )
+        )
+
+        self.b_place = list(
+            self.path_b_place[
+                -1
+            ]
+        )
+
+
+        # -----------------------------------------------------
+        # B_PLACE -> B_SAFE
+        #
+        # Vertical withdrawal after release.
+        # -----------------------------------------------------
+
+        self.path_b_lift = [
+            list(pose)
+            for pose in reversed(
+                self.path_b_place
+            )
+        ]
+
+
+        # Validate every Cartesian IK sample before allowing
+        # the experiment to start.
+
+        for path_name, path in [
+
+            (
+                'A_PREGRASP_PATH',
+                self.path_a_pregrasp,
+            ),
+
+            (
+                'A_PICK_PATH',
+                self.path_a_pick,
+            ),
+
+            (
+                'A_LIFT_PATH',
+                self.path_a_lift,
+            ),
+
+            (
+                'B_SAFE_PATH',
+                self.path_b_safe,
+            ),
+
+            (
+                'B_PLACE_PATH',
+                self.path_b_place,
+            ),
+
+            (
+                'B_LIFT_PATH',
+                self.path_b_lift,
+            ),
+
+        ]:
+
+            for pose in path:
+
+                self.kinematics.validate_joints(
+                    pose
+                )
+
+            self.get_logger().info(
+                f'{path_name}: '
+                f'{len(path)} Cartesian IK samples'
+            )
+
+
         self.get_logger().info(
             'B placement calibration: '
             f'fixed_B=('
@@ -1097,6 +1423,7 @@ class TaskManager(Node):
         self.state_started = False
 
         self.motion_active = False
+        self.path_active = False
 
         # -----------------------------------------------------
         # Trial-start reference
@@ -1167,6 +1494,7 @@ class TaskManager(Node):
         self.task_stopped = True
 
         self.motion_active = False
+        self.path_active = False
 
         self.get_logger().error(
             'Task manager received SAFE_STOP.'
@@ -1207,6 +1535,7 @@ class TaskManager(Node):
         self.task_stopped = True
 
         self.motion_active = False
+        self.path_active = False
 
         reason = str(
             reason
@@ -1383,6 +1712,227 @@ class TaskManager(Node):
 
         self.motion_active = True
 
+    def start_path_motion(
+        self,
+        path,
+        duration,
+    ):
+
+        if not path:
+
+            raise KinematicsError(
+                'Cartesian path is empty.'
+            )
+
+        for pose in path:
+
+            self.kinematics.validate_joints(
+                pose
+            )
+
+        # Use the same start-source policy as ordinary motion.
+        #
+        # Simulation:
+        # use continuous commanded state.
+        #
+        # Real robot:
+        # use measured hardware state at the START of the
+        # Cartesian state only.
+        if self.config.is_simulation:
+
+            start_pose = list(
+                self.commanded_pose
+            )
+
+        elif (
+            self.current_joint_state
+            is not None
+        ):
+
+            start_pose = list(
+                self.current_joint_state
+            )
+
+        else:
+
+            start_pose = list(
+                self.commanded_pose
+            )
+
+        self.path_waypoints = [
+            start_pose
+        ]
+
+        # The original first path pose represents the expected
+        # state boundary. The actual/current start_pose replaces
+        # it. All following samples remain the precomputed
+        # upright Cartesian path.
+        if len(path) > 1:
+
+            self.path_waypoints.extend(
+                [
+                    list(pose)
+                    for pose in path[
+                        1:
+                    ]
+                ]
+            )
+
+        else:
+
+            self.path_waypoints.append(
+                list(
+                    path[
+                        0
+                    ]
+                )
+            )
+
+        effective_duration = float(
+            duration
+        )
+
+        if self.config.is_real_robot:
+
+            effective_duration *= (
+                self.real_motion_duration_scale
+            )
+
+        self.path_start_time = (
+            self.now_seconds()
+        )
+
+        self.path_duration = max(
+            0.5,
+            effective_duration,
+        )
+
+        self.path_active = True
+
+
+    def update_path_motion(self):
+
+        elapsed = (
+            self.now_seconds()
+            -
+            self.path_start_time
+        )
+
+        progress = (
+            elapsed
+            /
+            self.path_duration
+        )
+
+        progress = max(
+            0.0,
+            min(
+                1.0,
+                progress,
+            ),
+        )
+
+        # Smooth only the overall path timing.
+        #
+        # Spatial interpolation itself follows the sequence
+        # of upright Cartesian IK samples.
+        smooth = (
+            self.smoothstep(
+                progress
+            )
+        )
+
+        segment_count = (
+            len(
+                self.path_waypoints
+            )
+            -
+            1
+        )
+
+        if segment_count <= 0:
+
+            self.path_active = False
+
+            return True
+
+        path_position = (
+            smooth
+            *
+            segment_count
+        )
+
+        segment_index = min(
+            segment_count - 1,
+            int(
+                path_position
+            ),
+        )
+
+        local_fraction = (
+            path_position
+            -
+            segment_index
+        )
+
+        start_pose = (
+            self.path_waypoints[
+                segment_index
+            ]
+        )
+
+        target_pose = (
+            self.path_waypoints[
+                segment_index
+                +
+                1
+            ]
+        )
+
+        pose = [
+
+            start_pose[index]
+            +
+            (
+                target_pose[index]
+                -
+                start_pose[index]
+            )
+            *
+            local_fraction
+
+            for index in range(
+                6
+            )
+        ]
+
+        self.publish_joint_command(
+            pose
+        )
+
+        self.commanded_pose = list(
+            pose
+        )
+
+        if progress >= 1.0:
+
+            self.commanded_pose = list(
+                self.path_waypoints[
+                    -1
+                ]
+            )
+
+            self.publish_joint_command(
+                self.commanded_pose
+            )
+
+            self.path_active = False
+
+            return True
+
+        return False
+
+
     @staticmethod
     def smoothstep(
         progress,
@@ -1531,6 +2081,25 @@ class TaskManager(Node):
             try:
 
                 self.start_motion(
+                    target,
+                    duration,
+                )
+
+            except KinematicsError as error:
+
+                self.fail_task(
+                    f'{name}: '
+                    +
+                    str(error)
+                )
+
+                return
+
+        elif state_type == 'path':
+
+            try:
+
+                self.start_path_motion(
                     target,
                     duration,
                 )
