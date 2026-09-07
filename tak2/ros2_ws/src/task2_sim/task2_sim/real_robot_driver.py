@@ -125,6 +125,13 @@ class RealRobotDriver(Node):
             ]
         )
 
+        self.command_period = float(
+            device.get(
+                'command_period_s',
+                0.10,
+            )
+        )
+
         self.feedback_period = float(
             device[
                 'feedback_period_s'
@@ -142,6 +149,20 @@ class RealRobotDriver(Node):
         self.last_feedback_success = None
 
         self.consecutive_feedback_errors = 0
+
+        # -----------------------------------------------------
+        # Latest-command buffer.
+        #
+        # Do NOT queue historical trajectory commands for the
+        # physical arm. Only the newest desired joint target
+        # matters.
+        # -----------------------------------------------------
+
+        self.latest_arm_degrees = None
+
+        self.last_sent_arm_degrees = None
+
+        self.arm_command_pending = False
 
         # -----------------------------------------------------
         # Load pymycobot only in REAL mode.
@@ -303,7 +324,13 @@ class RealRobotDriver(Node):
                     'joint_command_topic'
                 ],
                 self.arm_command_callback,
-                10,
+
+                # Real robot:
+                # KEEP LAST 1.
+                #
+                # Never allow stale joint targets to build up
+                # in the ROS subscriber queue.
+                1,
             )
         )
 
@@ -344,7 +371,24 @@ class RealRobotDriver(Node):
             )
         )
 
-        self.timer = self.create_timer(
+        # -----------------------------------------------------
+        # Real communication scheduling.
+        #
+        # Commands and feedback share the same TCP/Pi path.
+        #
+        # Command timer:
+        #   sends only the newest command.
+        #
+        # Feedback timer:
+        #   periodically reads measured joint angles.
+        # -----------------------------------------------------
+
+        self.arm_command_timer = self.create_timer(
+            self.command_period,
+            self.send_latest_arm_command,
+        )
+
+        self.feedback_timer = self.create_timer(
             self.feedback_period,
             self.read_joint_state,
         )
@@ -359,6 +403,17 @@ class RealRobotDriver(Node):
 
         self.get_logger().warn(
             f'Arm speed = {self.arm_speed}%'
+        )
+
+
+        self.get_logger().info(
+            f'Command period = '
+            f'{self.command_period:.2f} s'
+        )
+
+        self.get_logger().info(
+            f'Feedback period = '
+            f'{self.feedback_period:.2f} s'
         )
 
     # ========================================================
@@ -429,11 +484,90 @@ class RealRobotDriver(Node):
             for value in message.data
         ]
 
+        # -----------------------------------------------------
+        # IMPORTANT:
+        #
+        # Do NOT call send_angles() here.
+        #
+        # The ROS callback must remain fast so new messages
+        # cannot accumulate behind a blocking TCP operation.
+        #
+        # Simply replace the previous target with the newest.
+        # -----------------------------------------------------
+
+        self.latest_arm_degrees = list(
+            degrees
+        )
+
+        self.arm_command_pending = True
+
+
+    def send_latest_arm_command(
+        self,
+    ):
+
+        if self.stop_latched:
+
+            return
+
+        if (
+            not self.arm_command_pending
+            or
+            self.latest_arm_degrees is None
+        ):
+
+            return
+
+        degrees = list(
+            self.latest_arm_degrees
+        )
+
+        # Mark consumed BEFORE the blocking network call.
+        #
+        # With queue depth = 1, when the executor becomes free
+        # again it receives only the newest waiting command.
+        self.arm_command_pending = False
+
+
+        # -----------------------------------------------------
+        # Do not repeatedly transmit an identical final target.
+        #
+        # TaskManager intentionally keeps publishing the final
+        # target while waiting for measured convergence.
+        # -----------------------------------------------------
+
+        if (
+            self.last_sent_arm_degrees
+            is not None
+        ):
+
+            maximum_change = max(
+                abs(
+                    current
+                    -
+                    previous
+                )
+                for current, previous
+                in zip(
+                    degrees,
+                    self.last_sent_arm_degrees,
+                )
+            )
+
+            if maximum_change < 0.01:
+
+                return
+
+
         try:
 
             self.robot.send_angles(
                 degrees,
                 self.arm_speed,
+            )
+
+            self.last_sent_arm_degrees = list(
+                degrees
             )
 
         except Exception as error:
@@ -447,6 +581,7 @@ class RealRobotDriver(Node):
                 +
                 str(error)
             )
+
 
     # ========================================================
     # Gripper
@@ -632,6 +767,9 @@ class RealRobotDriver(Node):
             return
 
         self.stop_latched = True
+
+        self.arm_command_pending = False
+        self.latest_arm_degrees = None
 
         try:
 

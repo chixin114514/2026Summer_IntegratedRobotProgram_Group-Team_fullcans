@@ -24,4 +24,11 @@ real:
   robot_port: 9000
   arm_speed_percent: 20
   gripper_speed_percent: 20
-  feedback_period_s: 0.05
+  command_period_s: 0.10
+  feedback_period_s: 0.15
+  # Real hardware state synchronisation.
+  # A motion state cannot finish until measured joints
+  # actually reach the target.
+  goal_tolerance_deg: 2.0
+  goal_required_samples: 2
+  goal_timeout_s: 6.0

@@ -114,14 +114,35 @@ class TaskManager(Node):
             )
         )
 
+        if self.config.is_real_robot:
+
+            robot_feedback_topic = (
+                self.config.communication[
+                    'real'
+                ][
+                    'joint_state_topic'
+                ]
+            )
+
+            robot_feedback_depth = 1
+
+        else:
+
+            robot_feedback_topic = (
+                common[
+                    'robot_state_topic'
+                ]
+            )
+
+            robot_feedback_depth = 10
+
+
         self.robot_state_sub = (
             self.create_subscription(
                 JointState,
-                common[
-                    'robot_state_topic'
-                ],
+                robot_feedback_topic,
                 self.robot_state_callback,
-                10,
+                robot_feedback_depth,
             )
         )
 
@@ -335,6 +356,45 @@ class TaskManager(Node):
             )
         )
 
+
+        real_device = (
+            self.config.device.get(
+                'real',
+                {},
+            )
+        )
+
+        self.real_goal_tolerance = (
+            math.radians(
+                float(
+                    real_device.get(
+                        'goal_tolerance_deg',
+                        2.0,
+                    )
+                )
+            )
+        )
+
+        self.real_goal_required_samples = max(
+            1,
+            int(
+                real_device.get(
+                    'goal_required_samples',
+                    2,
+                )
+            ),
+        )
+
+        self.real_goal_timeout = max(
+            1.0,
+            float(
+                real_device.get(
+                    'goal_timeout_s',
+                    6.0,
+                )
+            ),
+        )
+
         self.home_duration = float(
             motion[
                 'home_duration_s'
@@ -478,6 +538,22 @@ class TaskManager(Node):
         # ====================================================
 
         self.current_joint_state = None
+
+        # Each REAL /joint_states message increments this.
+        #
+        # Goal confirmation counts NEW measured samples,
+        # never repeated reads of one old sample.
+        self.feedback_sequence = 0
+
+        self.motion_goal_last_feedback_sequence = -1
+
+        self.motion_goal_stable_samples = 0
+
+        self.motion_goal_wait_start = None
+
+        self.motion_goal_last_error = float(
+            'inf'
+        )
 
         # The simulated robot is spawned in HOME.
         # Keep the internal command reference consistent with
@@ -1060,6 +1136,9 @@ class TaskManager(Node):
             )
         ]
 
+        self.feedback_sequence += 1
+
+
     def safety_stop_callback(
         self,
         message,
@@ -1292,6 +1371,22 @@ class TaskManager(Node):
         self.motion_duration = max(
             0.5,
             effective_duration,
+        )
+
+        # -----------------------------------------------------
+        # Real-hardware convergence tracking for THIS motion.
+        # -----------------------------------------------------
+
+        self.motion_goal_last_feedback_sequence = (
+            self.feedback_sequence
+        )
+
+        self.motion_goal_stable_samples = 0
+
+        self.motion_goal_wait_start = None
+
+        self.motion_goal_last_error = float(
+            'inf'
         )
 
         self.motion_active = True
@@ -1791,13 +1886,196 @@ class TaskManager(Node):
                 self.motion_target_pose
             )
 
+            # Keep the final target alive while real hardware
+            # finishes physically travelling to the goal.
             self.publish_joint_command(
                 self.commanded_pose
             )
 
-            self.motion_active = False
 
-            return True
+            # =================================================
+            # SIMULATION
+            #
+            # Preserve existing behaviour exactly.
+            # =================================================
+
+            if self.config.is_simulation:
+
+                self.motion_active = False
+
+                return True
+
+
+            # =================================================
+            # REAL ROBOT
+            #
+            # Planning time finishing is NOT enough.
+            #
+            # Do not enter the next task state until actual
+            # measured joint feedback confirms arrival.
+            # =================================================
+
+            now = self.now_seconds()
+
+            if self.motion_goal_wait_start is None:
+
+                self.motion_goal_wait_start = now
+
+                # Require feedback newer than the instant the
+                # planned trajectory finished.
+                self.motion_goal_last_feedback_sequence = (
+                    self.feedback_sequence
+                )
+
+                self.motion_goal_stable_samples = 0
+
+                self.get_logger().info(
+                    'Real robot: waiting for measured '
+                    'goal convergence.'
+                )
+
+
+            # -------------------------------------------------
+            # Process each measured feedback sample ONCE.
+            # -------------------------------------------------
+
+            if (
+                self.current_joint_state is not None
+                and
+                self.feedback_sequence
+                !=
+                self.motion_goal_last_feedback_sequence
+            ):
+
+                self.motion_goal_last_feedback_sequence = (
+                    self.feedback_sequence
+                )
+
+                joint_errors = [
+
+                    abs(
+                        math.atan2(
+                            math.sin(
+                                measured
+                                -
+                                target
+                            ),
+                            math.cos(
+                                measured
+                                -
+                                target
+                            ),
+                        )
+                    )
+
+                    for measured, target
+                    in zip(
+                        self.current_joint_state,
+                        self.motion_target_pose,
+                    )
+                ]
+
+                maximum_error = max(
+                    joint_errors
+                )
+
+                self.motion_goal_last_error = (
+                    maximum_error
+                )
+
+                if (
+                    maximum_error
+                    <=
+                    self.real_goal_tolerance
+                ):
+
+                    self.motion_goal_stable_samples += 1
+
+                else:
+
+                    self.motion_goal_stable_samples = 0
+
+
+                if (
+                    self.motion_goal_stable_samples
+                    >=
+                    self.real_goal_required_samples
+                ):
+
+                    self.motion_active = False
+
+                    self.get_logger().info(
+                        'Real robot goal confirmed: '
+                        f'max_joint_error_deg='
+                        f'{math.degrees(maximum_error):.2f}'
+                    )
+
+                    return True
+
+
+            # -------------------------------------------------
+            # A communication/mechanical failure must stop
+            # cleanly instead of silently advancing states.
+            # -------------------------------------------------
+
+            if (
+                now
+                -
+                self.motion_goal_wait_start
+                >=
+                self.real_goal_timeout
+            ):
+
+                if math.isfinite(
+                    self.motion_goal_last_error
+                ):
+
+                    error_description = (
+                        f'{math.degrees(self.motion_goal_last_error):.2f} deg'
+                    )
+
+                else:
+
+                    error_description = (
+                        'no new measured feedback'
+                    )
+
+                state_name = (
+                    self.sequence[
+                        self.state_index
+                    ][
+                        0
+                    ]
+                    if (
+                        0
+                        <=
+                        self.state_index
+                        <
+                        len(
+                            self.sequence
+                        )
+                    )
+                    else
+                    'UNKNOWN'
+                )
+
+                self.motion_active = False
+
+                self.fail_task(
+                    'REAL_MOTION_GOAL_TIMEOUT '
+                    f'state={state_name} '
+                    f'max_joint_error={error_description}'
+                )
+
+                return False
+
+
+            # Real robot is still moving.
+            #
+            # Stay in THIS state.
+            # Absolutely do not start the next state.
+            return False
+
 
         return False
 

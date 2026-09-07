@@ -49,6 +49,13 @@ class ArmInterface(Node):
         # Unified upper-level command
         # -----------------------------------------------------
 
+        command_queue_depth = (
+            10
+            if self.config.is_simulation
+            else 1
+        )
+
+
         self.command_sub = (
             self.create_subscription(
                 Float64MultiArray,
@@ -56,7 +63,7 @@ class ArmInterface(Node):
                     'arm_command_topic'
                 ],
                 self.command_callback,
-                10,
+                command_queue_depth,
             )
         )
 
@@ -117,7 +124,9 @@ class ArmInterface(Node):
                 self.create_publisher(
                     Float64MultiArray,
                     str(real_topic),
-                    10,
+
+                    # Physical backend only needs newest target.
+                    1,
                 )
             )
 
