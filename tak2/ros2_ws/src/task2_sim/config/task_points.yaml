@@ -44,7 +44,7 @@ motion:
   # Real hardware motions are deliberately slower.
   # Keeps consecutive commands below the 3 deg
   # real-robot safety step limit.
-  real_motion_duration_scale: 2.0
+  real_motion_duration_scale: 2.5
   home_duration_s: 1.5
   approach_duration_s: 1.8
   descend_duration_s: 0.9
