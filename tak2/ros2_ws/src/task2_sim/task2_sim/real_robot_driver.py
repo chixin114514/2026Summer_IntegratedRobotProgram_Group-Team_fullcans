@@ -228,6 +228,37 @@ class RealRobotDriver(Node):
             )
 
         # -----------------------------------------------------
+        # Real-time command mode.
+        #
+        # TaskManager streams smooth intermediate targets.
+        # Execute the newest command instead of building a
+        # command queue on the physical robot.
+        # -----------------------------------------------------
+
+        try:
+
+            if hasattr(
+                self.robot,
+                'set_fresh_mode',
+            ):
+
+                self.robot.set_fresh_mode(
+                    1
+                )
+
+                self.get_logger().info(
+                    'Real robot fresh mode = 1 '
+                    '(latest command first)'
+                )
+
+        except Exception as error:
+
+            self.get_logger().warn(
+                'Unable to set fresh mode: '
+                + str(error)
+            )
+
+        # -----------------------------------------------------
         # Publishers
         # -----------------------------------------------------
 
@@ -494,6 +525,7 @@ class RealRobotDriver(Node):
             self.robot.set_gripper_value(
                 device_value,
                 self.gripper_speed,
+                1,  # Adaptive Gripper
             )
 
         except Exception as error:
@@ -590,6 +622,14 @@ class RealRobotDriver(Node):
     # ========================================================
 
     def perform_stop(self):
+
+        # SAFE_STOP is latched.
+        #
+        # Repeated stop messages must NOT repeatedly transmit
+        # stop() to the physical robot.
+        if self.stop_latched:
+
+            return
 
         self.stop_latched = True
 
