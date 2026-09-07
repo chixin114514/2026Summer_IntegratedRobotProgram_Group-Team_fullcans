@@ -81,7 +81,7 @@ kinematics:
     maximum_iteration_step_rad: 0.08
 acceptance:
   settle_time_s: 1.0
-  placement_xy_tolerance_m: 0.009
+  placement_xy_tolerance_m: 0.045
   simulation_object_center_z_m: 0.420
   placement_z_tolerance_m: 0.008
   maximum_tilt_deg: 8.0

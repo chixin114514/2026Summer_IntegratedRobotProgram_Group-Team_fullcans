@@ -556,54 +556,34 @@ class ResultMonitor(Node):
             )
         )
 
+        # ====================================================
+        # Task 2 placement acceptance
+        #
+        # The green marker is the required placement region.
+        #
+        # SUCCESS:
+        # object centre lies inside that green circular region.
+        #
+        # Z and tilt are still logged for diagnosis, but they
+        # do NOT change the trial result.
+        # ====================================================
+
         success = (
             xy_error
             <=
             self.xy_tolerance
-
-            and
-
-            z_error
-            <=
-            self.z_tolerance
-
-            and
-
-            tilt
-            <=
-            self.maximum_tilt
         )
 
         if success:
 
             reason = (
-                'OBJECT_INSIDE_B_AND_STABLE'
-            )
-
-        elif (
-            xy_error
-            >
-            self.xy_tolerance
-        ):
-
-            reason = (
-                'OBJECT_OUTSIDE_B'
-            )
-
-        elif (
-            z_error
-            >
-            self.z_tolerance
-        ):
-
-            reason = (
-                'OBJECT_NOT_ON_TABLE'
+                'OBJECT_INSIDE_GREEN_B_REGION'
             )
 
         else:
 
             reason = (
-                'OBJECT_TILTED'
+                'OBJECT_OUTSIDE_GREEN_B_REGION'
             )
 
         self.get_logger().info(

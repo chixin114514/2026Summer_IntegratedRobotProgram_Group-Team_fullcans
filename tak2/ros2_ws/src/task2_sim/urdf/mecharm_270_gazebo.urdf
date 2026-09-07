@@ -445,20 +445,30 @@
       <material name="ag_white"/>
     </visual>
 
+    <!-- Large rubber gripping pad -->
     <visual>
-      <origin xyz="0.019 0 0.022" rpy="0 0 0"/>
+      <origin xyz="0.020 0 0.022" rpy="0 0 0"/>
       <geometry>
-        <box size="0.004 0.024 0.030"/>
+        <box size="0.006 0.030 0.034"/>
       </geometry>
       <material name="ag_dark">
         <color rgba="0.10 0.10 0.11 1"/>
       </material>
     </visual>
 
-    <collision>
-      <origin xyz="0.013 0 0.022" rpy="0 0 0"/>
+    <!-- Recessed structural finger collision -->
+    <collision name="left_finger_body_collision">
+      <origin xyz="0.010 0 0.022" rpy="0 0 0"/>
       <geometry>
         <box size="0.010 0.022 0.030"/>
+      </geometry>
+    </collision>
+
+    <!-- Actual rubber gripping surface -->
+    <collision name="left_grip_pad_collision">
+      <origin xyz="0.020 0 0.022" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.006 0.030 0.034"/>
       </geometry>
     </collision>
 
@@ -610,18 +620,28 @@
       <material name="ag_white"/>
     </visual>
 
+    <!-- Large rubber gripping pad -->
     <visual>
-      <origin xyz="-0.019 0 0.022" rpy="0 0 0"/>
+      <origin xyz="-0.020 0 0.022" rpy="0 0 0"/>
       <geometry>
-        <box size="0.004 0.024 0.030"/>
+        <box size="0.006 0.030 0.034"/>
       </geometry>
       <material name="ag_dark"/>
     </visual>
 
-    <collision>
-      <origin xyz="-0.013 0 0.022" rpy="0 0 0"/>
+    <!-- Recessed structural finger collision -->
+    <collision name="right_finger_body_collision">
+      <origin xyz="-0.010 0 0.022" rpy="0 0 0"/>
       <geometry>
         <box size="0.010 0.022 0.030"/>
+      </geometry>
+    </collision>
+
+    <!-- Actual rubber gripping surface -->
+    <collision name="right_grip_pad_collision">
+      <origin xyz="-0.020 0 0.022" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.006 0.030 0.034"/>
       </geometry>
     </collision>
 
