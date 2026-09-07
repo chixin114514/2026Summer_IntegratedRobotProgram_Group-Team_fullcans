@@ -327,6 +327,13 @@ class TaskManager(Node):
             ]
         )
 
+        self.real_motion_duration_scale = float(
+            motion.get(
+                'real_motion_duration_scale',
+                2.0,
+            )
+        )
+
         self.home_duration = float(
             motion[
                 'home_duration_s'
@@ -1300,9 +1307,19 @@ class TaskManager(Node):
             self.now_seconds()
         )
 
+        effective_duration = float(
+            duration
+        )
+
+        if self.config.is_real_robot:
+
+            effective_duration *= (
+                self.real_motion_duration_scale
+            )
+
         self.motion_duration = max(
             0.5,
-            float(duration),
+            effective_duration,
         )
 
         self.motion_active = True
