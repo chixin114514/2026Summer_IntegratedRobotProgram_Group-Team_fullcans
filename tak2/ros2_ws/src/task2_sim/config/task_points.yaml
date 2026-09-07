@@ -33,7 +33,7 @@ placement_offset_b:
   #   +Y = left
   #   -Y = right
   x: 0.000
-  y: -0.005
+  y: -0.010
   z: 0.000
 
 safe_height:
