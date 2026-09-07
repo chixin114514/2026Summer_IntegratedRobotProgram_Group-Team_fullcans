@@ -387,6 +387,23 @@ class TaskManager(Node):
             ]
         )
 
+        # Gentle adaptive-gripper release.
+        #
+        # First reduce gripping force / linkage closure,
+        # then fully open. This prevents the rotating linkage
+        # from suddenly sweeping the object sideways.
+        self.gripper_release_partial = (
+            self.gripper_open
+            +
+            0.20
+            *
+            (
+                self.gripper_closed
+                -
+                self.gripper_open
+            )
+        )
+
         # ====================================================
         # Runtime state
         # ====================================================
@@ -556,9 +573,20 @@ class TaskManager(Node):
                 self.b_place,
                 self.descend_duration,
 
-                # Hold the complete grasped object still at the
-                # compensated B position before releasing.
-                0.60,
+                # Let the cube settle on the table before
+                # changing the adaptive linkage.
+                0.80,
+            ),
+
+            (
+                'RELEASE_GRIPPER_PARTIAL',
+                'gripper',
+                self.gripper_release_partial,
+                0.0,
+
+                # First unload most of the gripping force.
+                # The wrist remains completely stationary.
+                0.50,
             ),
 
             (
@@ -567,8 +595,8 @@ class TaskManager(Node):
                 self.gripper_open,
                 0.0,
 
-                # Let both physical fingers fully clear the
-                # object while the wrist remains stationary.
+                # Finish opening only after the object has
+                # already been unloaded and is resting.
                 max(
                     self.gripper_open_duration,
                     0.80,
@@ -792,15 +820,28 @@ class TaskManager(Node):
 
         self.b_release_target = [
 
-            self.point_b[index]
+            self.point_b[0]
             +
-            self.grasp_offset_a[index]
+            self.grasp_offset_a[0]
             +
-            self.placement_offset_b[index]
+            self.placement_offset_b[0],
 
-            for index in range(
-                3
-            )
+            self.point_b[1]
+            +
+            self.grasp_offset_a[1]
+            +
+            self.placement_offset_b[1],
+
+            # Preserve the successful A grasp height.
+            #
+            # The old code used point_b.z = 0.028, which
+            # pushed the held cube about 10 mm too low before
+            # release. With the rotational adaptive gripper,
+            # that preload can make the opening linkage push
+            # or throw the object.
+            self.a_grasp_target[2]
+            +
+            self.placement_offset_b[2],
         ]
 
         b_safe_xyz = [
@@ -876,7 +917,8 @@ class TaskManager(Node):
             f'{self.point_b[1]:.3f}) '
             f'release_TCP=('
             f'{self.b_release_target[0]:.3f}, '
-            f'{self.b_release_target[1]:.3f}) '
+            f'{self.b_release_target[1]:.3f}, '
+            f'{self.b_release_target[2]:.3f}) '
             f'grasp_offset=('
             f'{self.grasp_offset_a[0] * 1000:.0f}, '
             f'{self.grasp_offset_a[1] * 1000:.0f}) mm '
