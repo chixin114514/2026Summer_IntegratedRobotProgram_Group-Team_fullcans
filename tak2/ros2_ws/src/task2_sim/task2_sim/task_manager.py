@@ -372,6 +372,13 @@ class TaskManager(Node):
             )
         )
 
+        self.post_lift_hold = float(
+            motion.get(
+                'post_lift_hold_s',
+                0.80,
+            )
+        )
+
         gripper = (
             task[
                 'gripper'
@@ -588,7 +595,12 @@ class TaskManager(Node):
                 'path',
                 self.path_a_lift,
                 self.lift_duration,
-                0.20,
+
+                # After the cube reaches the higher safe
+                # transport height, hold completely still.
+                # Horizontal transfer begins only after the
+                # grasp / orientation has settled.
+                self.post_lift_hold,
             ),
 
             (
@@ -1023,6 +1035,7 @@ class TaskManager(Node):
             start_xyz,
             end_xyz,
             start_pose,
+            end_pose,
         ):
 
             dx = (
@@ -1071,7 +1084,7 @@ class TaskManager(Node):
                 )
             ]
 
-            seed = list(
+            previous_pose = list(
                 start_pose
             )
 
@@ -1107,20 +1120,95 @@ class TaskManager(Node):
                     fraction,
                 ]
 
-                seed = (
-                    self.kinematics.solve_pose(
-                        xyz,
-                        transport_rotation,
-                        seed,
-                        position_tolerance=0.006,
+                # ---------------------------------------------
+                # Primary seed:
+                # interpolate between two already-valid
+                # endpoint joint solutions.
+                #
+                # This keeps numerical IK on the intended
+                # upright physical branch.
+                # ---------------------------------------------
+
+                interpolated_seed = [
+
+                    start_pose[index]
+                    +
+                    (
+                        end_pose[index]
+                        -
+                        start_pose[index]
                     )
+                    *
+                    fraction
+
+                    for index in range(
+                        6
+                    )
+                ]
+
+                candidate_seeds = [
+
+                    interpolated_seed,
+
+                    previous_pose,
+
+                    list(
+                        end_pose
+                    ),
+
+                    list(
+                        start_pose
+                    ),
+                ]
+
+                solved_pose = None
+                last_error = None
+
+                for candidate_seed in (
+                    candidate_seeds
+                ):
+
+                    try:
+
+                        solved_pose = (
+                            self.kinematics.solve_pose(
+                                xyz,
+                                transport_rotation,
+                                candidate_seed,
+                                position_tolerance=0.008,
+                            )
+                        )
+
+                        break
+
+                    except KinematicsError as error:
+
+                        last_error = error
+
+                if solved_pose is None:
+
+                    raise NoIKSolutionError(
+                        'Cartesian path IK failed at '
+                        f'fraction={fraction:.3f}, '
+                        f'target={xyz}: '
+                        f'{last_error}'
+                    )
+
+                previous_pose = list(
+                    solved_pose
                 )
 
                 path.append(
                     list(
-                        seed
+                        solved_pose
                     )
                 )
+
+            # The final waypoint is already a validated exact
+            # endpoint solution. Use it explicitly.
+            path[-1] = list(
+                end_pose
+            )
 
             return path
 
@@ -1138,6 +1226,7 @@ class TaskManager(Node):
                 a_safe_xyz,
                 a_pregrasp_xyz,
                 self.a_safe,
+                self.a_pregrasp,
             )
         )
 
@@ -1159,6 +1248,7 @@ class TaskManager(Node):
                 a_pregrasp_xyz,
                 self.a_grasp_target,
                 self.a_pregrasp,
+                self.a_pick,
             )
         )
 
@@ -1208,6 +1298,7 @@ class TaskManager(Node):
                 a_safe_xyz,
                 b_safe_xyz,
                 self.a_safe,
+                self.b_safe,
             )
         )
 
@@ -1229,6 +1320,7 @@ class TaskManager(Node):
                 b_safe_xyz,
                 self.b_release_target,
                 self.b_safe,
+                self.b_place,
             )
         )
 

@@ -37,7 +37,7 @@ placement_offset_b:
   z: 0.000
 
 safe_height:
-  z: 0.110
+  z: 0.150
 motion:
   simulation_speed_scale: 0.4
   real_speed_scale: 0.2
@@ -53,6 +53,9 @@ motion:
   # Cartesian path resolution for upright grasp,
   # lift, transfer and placement.
   cartesian_path_step_m: 0.005
+  # Hold the grasped object upright at safe height
+  # before beginning horizontal transport.
+  post_lift_hold_s: 0.80
 gripper:
   open_position: 0.0
   closed_position: 0.0120
