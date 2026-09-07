@@ -7,7 +7,7 @@ home:
   - 90.0
   - 0.0
 point_a:
-  x: 0.195
+  x: 0.180
   y: 0.125
   z:     0.038
 grasp_offset_a:
@@ -16,7 +16,7 @@ grasp_offset_a:
   #
   # Positive X/Y moves the gripper farther
   # outward towards the physical cube.
-  x: 0.008
+  x: 0.020
   y: 0.005
   z: 0.000
 
@@ -90,7 +90,7 @@ simulation_reset:
   object_name: target_object
   world_name: task2_world
   point_a_world:
-    x: 0.195
+    x: 0.180
     y: 0.125
     z:     0.415
     roll: 0.0
