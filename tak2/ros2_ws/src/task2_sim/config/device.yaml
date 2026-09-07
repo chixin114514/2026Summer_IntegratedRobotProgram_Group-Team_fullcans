@@ -1,4 +1,4 @@
-mode: 0
+mode: 1
 robot:
   name: mecharm_270_pi
   dof: 6
@@ -19,7 +19,9 @@ real:
   baudrate: 115200
   timeout_s: 1.0
   low_speed_mode: true
-  driver_type: pymycobot_serial
+  driver_type: pymycobot_socket
+  robot_ip: 10.238.238.133
+  robot_port: 9000
   arm_speed_percent: 20
   gripper_speed_percent: 20
   feedback_period_s: 0.2

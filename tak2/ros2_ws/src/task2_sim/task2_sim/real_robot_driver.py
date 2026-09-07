@@ -66,16 +66,51 @@ class RealRobotDriver(Node):
             ]
         )
 
+        # -----------------------------------------------------
+        # Real communication backend
+        #
+        # mechArm 270 Pi:
+        #
+        # Jetson
+        #   -> Wi-Fi / TCP
+        #   -> Server_270.py
+        #   -> /dev/ttyAMA0
+        #   -> robot controller
+        # -----------------------------------------------------
+
+        self.driver_type = str(
+            device.get(
+                'driver_type',
+                'pymycobot_serial',
+            )
+        )
+
         self.device = str(
-            device[
-                'serial_device'
-            ]
+            device.get(
+                'serial_device',
+                '/dev/ttyUSB0',
+            )
         )
 
         self.baudrate = int(
-            device[
-                'baudrate'
-            ]
+            device.get(
+                'baudrate',
+                115200,
+            )
+        )
+
+        self.robot_ip = str(
+            device.get(
+                'robot_ip',
+                '10.238.238.133',
+            )
+        )
+
+        self.robot_port = int(
+            device.get(
+                'robot_port',
+                9000,
+            )
         )
 
         self.arm_speed = int(
@@ -114,17 +149,37 @@ class RealRobotDriver(Node):
 
         try:
 
-            try:
+            if (
+                self.driver_type
+                ==
+                'pymycobot_socket'
+            ):
 
-                from pymycobot.mecharm270 import (
-                    MechArm270,
-                )
+                try:
 
-            except ImportError:
+                    from pymycobot import (
+                        MechArmSocket,
+                    )
 
-                from pymycobot import (
-                    MechArm270,
-                )
+                except ImportError:
+
+                    from pymycobot.mecharmsocket import (
+                        MechArmSocket,
+                    )
+
+            else:
+
+                try:
+
+                    from pymycobot.mecharm270 import (
+                        MechArm270,
+                    )
+
+                except ImportError:
+
+                    from pymycobot import (
+                        MechArm270,
+                    )
 
         except ImportError as error:
 
@@ -133,17 +188,37 @@ class RealRobotDriver(Node):
                 'Install it before real-robot operation.'
             ) from error
 
-        self.get_logger().info(
-            'Connecting to MechArm 270: '
-            f'{self.device} @ {self.baudrate}'
-        )
 
         try:
 
-            self.robot = MechArm270(
-                self.device,
-                self.baudrate,
-            )
+            if (
+                self.driver_type
+                ==
+                'pymycobot_socket'
+            ):
+
+                self.get_logger().info(
+                    'Connecting to mechArm 270 Pi '
+                    'through TCP socket: '
+                    f'{self.robot_ip}:{self.robot_port}'
+                )
+
+                self.robot = MechArmSocket(
+                    self.robot_ip,
+                    self.robot_port,
+                )
+
+            else:
+
+                self.get_logger().info(
+                    'Connecting to MechArm 270 serial: '
+                    f'{self.device} @ {self.baudrate}'
+                )
+
+                self.robot = MechArm270(
+                    self.device,
+                    self.baudrate,
+                )
 
         except Exception as error:
 
