@@ -23,6 +23,7 @@ from task2_sim.kinematics import (
     MechArmKinematics,
     NoIKSolutionError,
     UnreachableTargetError,
+    rpy_matrix,
 )
 
 from task2_sim.runtime_config import (
@@ -737,28 +738,78 @@ class TaskManager(Node):
         # A pick
         # -----------------------------------------------------
 
-        pick_seed = (
-            self.kinematics.pick_seed()
+        # -----------------------------------------------------
+        # Upright grasp / transport orientation
+        #
+        # The old implementation inherited orientation from
+        # pick_seed_deg. That seed was intentionally tilted,
+        # so the cube was grasped and transported at an angle.
+        #
+        # The task now explicitly requires a vertical tool:
+        #
+        #   roll  = 180 deg
+        #   pitch =   0 deg
+        #   yaw   =  90 deg
+        #
+        # This same physical orientation is shared by
+        # A_PICK, A_PREGRASP, A_SAFE, B_SAFE and B_PLACE.
+        # -----------------------------------------------------
+
+        upright_config = (
+            self.config.task[
+                'kinematics'
+            ]
         )
 
-        # -----------------------------------------------------
-        # A_PICK orientation
-        #
-        # The calibrated seed defines not only a useful XYZ
-        # starting point but also the intended physical gripper
-        # orientation.
-        #
-        # Position-only IK previously allowed J4/J5/J6 to rotate
-        # freely.  That could make the gripper support arms sweep
-        # sideways into the cube during the final approach.
-        # -----------------------------------------------------
+        upright_rpy_deg = (
+            upright_config[
+                'upright_tool_rpy_deg'
+            ]
+        )
 
-        calibrated_pick_rotation = (
-            self.kinematics.forward_rotation(
-                pick_seed
+        upright_rotation = (
+            rpy_matrix(
+                math.radians(
+                    float(
+                        upright_rpy_deg[0]
+                    )
+                ),
+                math.radians(
+                    float(
+                        upright_rpy_deg[1]
+                    )
+                ),
+                math.radians(
+                    float(
+                        upright_rpy_deg[2]
+                    )
+                ),
             )
         )
 
+        upright_seeds = (
+            upright_config[
+                'upright_seed_deg'
+            ]
+        )
+
+        def upright_seed(name):
+
+            return (
+                self.kinematics
+                .degrees_to_radians(
+                    upright_seeds[
+                        name
+                    ]
+                )
+            )
+
+        self.get_logger().info(
+            'Upright tool orientation: '
+            f'roll={upright_rpy_deg[0]:.1f} '
+            f'pitch={upright_rpy_deg[1]:.1f} '
+            f'yaw={upright_rpy_deg[2]:.1f} deg'
+        )
 
         self.get_logger().info(
             'A calibration: '
@@ -776,17 +827,17 @@ class TaskManager(Node):
         self.a_pick = (
             self.kinematics.solve_pose(
                 self.a_grasp_target,
-                calibrated_pick_rotation,
-                pick_seed,
+                upright_rotation,
+                upright_seed(
+                    'a_pick'
+                ),
             )
         )
 
-        # Preserve the same gripper orientation throughout
-        # pre-grasp, lift and transport.
+        # Keep exactly the same vertical orientation
+        # throughout lift, transport and placement.
         transport_rotation = (
-            self.kinematics.forward_rotation(
-                self.a_pick
-            )
+            upright_rotation
         )
 
         a_safe_xyz = [
@@ -864,7 +915,9 @@ class TaskManager(Node):
             self.kinematics.solve_pose(
                 a_pregrasp_xyz,
                 transport_rotation,
-                self.a_pick,
+                upright_seed(
+                    'a_pregrasp'
+                ),
                 position_tolerance=0.010,
             )
         )
@@ -877,7 +930,9 @@ class TaskManager(Node):
             self.kinematics.solve_pose(
                 a_safe_xyz,
                 transport_rotation,
-                self.a_pregrasp,
+                upright_seed(
+                    'a_safe'
+                ),
 
                 # Safe-height waypoint:
                 # exact millimetre positioning is not required.
@@ -893,7 +948,9 @@ class TaskManager(Node):
             self.kinematics.solve_pose(
                 b_safe_xyz,
                 transport_rotation,
-                self.a_safe,
+                upright_seed(
+                    'b_safe'
+                ),
 
                 # Transfer waypoint above B.
                 # A small XY deviation is acceptable here;
@@ -912,7 +969,9 @@ class TaskManager(Node):
             self.kinematics.solve_pose(
                 self.b_release_target,
                 transport_rotation,
-                self.b_safe,
+                upright_seed(
+                    'b_place'
+                ),
             )
         )
 

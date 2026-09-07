@@ -63,21 +63,83 @@ experiment:
   total_trials: 5
   required_successes: 4
 kinematics:
-  tool_offset_m: 0.045
+  # TCP length for the current myCobot Adaptive Gripper AG.
+  tool_offset_m: 0.090
+
+  # Unified grasp / transport orientation.
+  #
+  # roll  = 180 deg -> tool points vertically downward
+  # pitch =   0 deg -> no forward/backward tilt
+  # yaw   =  90 deg -> gripper edges parallel to cube edges
+  upright_tool_rpy_deg:
+  - 180.0
+  - 0.0
+  - 90.0
+
+  # Initial IK seed at A_PICK.
   pick_seed_deg:
-  - 25.0
-  - 54.0
-  - -13.0
-  - 33.0
-  - 29.0
-  - 88.0
+  - 22.9584
+  - 61.3721
+  - -53.6191
+  - 17.5440
+  - 67.3769
+  - 18.2891
+
+  # Initial IK seed at B_PLACE.
   place_seed_deg:
-  - -25.0
-  - 54.0
-  - -13.0
-  - 33.0
-  - 29.0
-  - 88.0
+  - -16.5821
+  - 52.3508
+  - -41.4833
+  - -13.9324
+  - 74.8277
+  - -13.4263
+
+  # Stable IK branches for the upright gripper.
+  #
+  # These do NOT define a new task.
+  # They only keep the numerical IK solver on the same
+  # physically upright solution branch at every waypoint.
+  upright_seed_deg:
+
+    a_pick:
+    - 22.9584
+    - 61.3721
+    - -53.6191
+    - 17.5440
+    - 67.3769
+    - 18.2891
+
+    a_pregrasp:
+    - 27.4447
+    - 57.3221
+    - -77.0366
+    - 8.9011
+    - 88.6496
+    - 28.8922
+
+    a_safe:
+    - 27.4414
+    - 54.7220
+    - -79.4325
+    - 8.9050
+    - 90.8946
+    - 29.4619
+
+    b_safe:
+    - -6.3382
+    - 30.7206
+    - -36.4935
+    - -27.7946
+    - 83.2663
+    - -6.0991
+
+    b_place:
+    - -16.5821
+    - 52.3508
+    - -41.4833
+    - -13.9324
+    - 74.8277
+    - -13.4263
   solver:
     maximum_iterations: 400
     numerical_step_rad: 0.001
