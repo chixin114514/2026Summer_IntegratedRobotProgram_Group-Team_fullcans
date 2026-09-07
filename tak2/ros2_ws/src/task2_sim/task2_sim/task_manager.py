@@ -595,7 +595,7 @@ class TaskManager(Node):
                 'motion',
                 self.home,
                 self.home_duration,
-                0.20,
+                0.0,
             ),
 
             (
@@ -611,39 +611,23 @@ class TaskManager(Node):
                 'motion',
                 self.a_safe,
                 self.approach_duration,
-
-                # Reach the final upright pose above A,
-                # then remain completely still.
-                self.a_safe_hold,
+                0.0,
             ),
 
             (
                 'A_PREGRASP',
-
-                # Stationary pre-grasp settling state.
-                #
-                # Same pose as A_SAFE:
-                # no X/Y/Z movement and no wrist movement.
                 'motion',
-                self.a_safe,
-
-                # start_motion has a 0.5 s minimum duration.
-                # Since start == target, the robot simply
-                # keeps receiving the same hold pose.
-                0.50,
-
-                self.pregrasp_hold,
+                self.a_pregrasp,
+                0.55,
+                0.0,
             ),
 
             (
                 'A_PICK',
-                'cartesian',
-                self.a_pick_xyz,
-
-                # Slow final insertion, matching the
-                # low-speed real-robot demonstration.
-                1.00,
-                0.25,
+                'motion',
+                self.a_pick,
+                self.descend_duration,
+                0.0,
             ),
 
             (
@@ -656,34 +640,26 @@ class TaskManager(Node):
 
             (
                 'A_LIFT',
-                'cartesian',
-                self.a_safe_xyz,
+                'motion',
+                self.a_safe,
                 self.lift_duration,
-
-                # After the cube reaches the higher safe
-                # transport height, hold completely still.
-                # Horizontal transfer begins only after the
-                # grasp / orientation has settled.
-                self.post_lift_hold,
+                0.0,
             ),
 
             (
                 'B_SAFE',
-                'cartesian',
-                self.b_safe_xyz,
+                'motion',
+                self.b_safe,
                 self.transfer_duration,
-                0.20,
+                0.0,
             ),
 
             (
                 'B_PLACE',
-                'cartesian',
-                self.b_place_xyz,
+                'motion',
+                self.b_place,
                 self.descend_duration,
-
-                # Let the cube settle on the table before
-                # changing the adaptive linkage.
-                0.80,
+                0.0,
             ),
 
             (
@@ -691,10 +667,7 @@ class TaskManager(Node):
                 'gripper',
                 self.gripper_release_partial,
                 0.0,
-
-                # First unload most of the gripping force.
-                # The wrist remains completely stationary.
-                0.50,
+                0.30,
             ),
 
             (
@@ -702,21 +675,15 @@ class TaskManager(Node):
                 'gripper',
                 self.gripper_open,
                 0.0,
-
-                # Finish opening only after the object has
-                # already been unloaded and is resting.
-                max(
-                    self.gripper_open_duration,
-                    0.80,
-                ),
+                self.gripper_open_duration,
             ),
 
             (
                 'B_LIFT',
-                'cartesian',
-                self.b_safe_xyz,
+                'motion',
+                self.b_safe,
                 self.lift_duration,
-                0.20,
+                0.0,
             ),
 
             (
@@ -724,8 +691,9 @@ class TaskManager(Node):
                 'motion',
                 self.home,
                 self.home_duration,
-                0.20,
+                0.0,
             ),
+
         ]
 
         # 20 Hz:
@@ -830,312 +798,111 @@ class TaskManager(Node):
 
     def build_waypoints(self):
 
-        self.kinematics.validate_joints(
-            self.home
-        )
+        # ====================================================
+        # STRICT UPRIGHT JOINT MANIFOLD
+        #
+        # For the current mechArm 270 kinematic chain and the
+        # required downward tool orientation:
+        #
+        #     J4 = 0
+        #     J5 = 90 deg - J2 - J3
+        #     J6 = J1
+        #
+        # All stored task poses already obey this relation.
+        #
+        # Therefore:
+        #   - no numerical full-pose IK is required
+        #   - no Cartesian servo is required
+        #   - no offline path sampling is required
+        #
+        # Runtime only performs smooth interpolation of
+        # J1/J2/J3 and analytically reconstructs J4/J5/J6.
+        # ====================================================
 
-        # -----------------------------------------------------
-        # A pick
-        # -----------------------------------------------------
-
-        # -----------------------------------------------------
-        # Upright grasp / transport orientation
-        #
-        # The old implementation inherited orientation from
-        # pick_seed_deg. That seed was intentionally tilted,
-        # so the cube was grasped and transported at an angle.
-        #
-        # The task now explicitly requires a vertical tool:
-        #
-        #   roll  = 180 deg
-        #   pitch =   0 deg
-        #   yaw   =  90 deg
-        #
-        # This same physical orientation is shared by
-        # A_PICK, A_PREGRASP, A_SAFE, B_SAFE and B_PLACE.
-        # -----------------------------------------------------
-
-        upright_config = (
+        upright = (
             self.config.task[
                 'kinematics'
-            ]
-        )
-
-        upright_rpy_deg = (
-            upright_config[
-                'upright_tool_rpy_deg'
-            ]
-        )
-
-        upright_rotation = (
-            rpy_matrix(
-                math.radians(
-                    float(
-                        upright_rpy_deg[0]
-                    )
-                ),
-                math.radians(
-                    float(
-                        upright_rpy_deg[1]
-                    )
-                ),
-                math.radians(
-                    float(
-                        upright_rpy_deg[2]
-                    )
-                ),
-            )
-        )
-
-        upright_seeds = (
-            upright_config[
+            ][
                 'upright_seed_deg'
             ]
         )
 
-        def upright_seed(name):
+        def get_pose(
+            name,
+        ):
 
-            return (
+            pose = (
                 self.kinematics
                 .degrees_to_radians(
-                    upright_seeds[
+                    upright[
                         name
                     ]
                 )
             )
 
-        self.get_logger().info(
-            'Upright tool orientation: '
-            f'roll={upright_rpy_deg[0]:.1f} '
-            f'pitch={upright_rpy_deg[1]:.1f} '
-            f'yaw={upright_rpy_deg[2]:.1f} deg'
+            self.kinematics.validate_joints(
+                pose
+            )
+
+            return pose
+
+
+        self.a_pick = get_pose(
+            'a_pick'
         )
 
-        self.get_logger().info(
-            'A calibration: '
-            f'fixed_A=('
-            f'{self.point_a[0]:.3f}, '
-            f'{self.point_a[1]:.3f}) '
-            f'grasp_target=('
-            f'{self.a_grasp_target[0]:.3f}, '
-            f'{self.a_grasp_target[1]:.3f}) '
-            f'offset=('
-            f'{self.grasp_offset_a[0] * 1000:.0f}, '
-            f'{self.grasp_offset_a[1] * 1000:.0f}) mm'
+        self.a_pregrasp = get_pose(
+            'a_pregrasp'
         )
 
-        self.a_pick = (
-            self.kinematics.solve_pose(
-                self.a_grasp_target,
-                upright_rotation,
-                upright_seed(
-                    'a_pick'
-                ),
+        self.a_safe = get_pose(
+            'a_safe'
+        )
+
+        self.b_safe = get_pose(
+            'b_safe'
+        )
+
+        self.b_place = get_pose(
+            'b_place'
+        )
+
+
+        self.a_pick_xyz = (
+            self.kinematics.forward_position(
+                self.a_pick
             )
         )
 
-        # Keep exactly the same vertical orientation
-        # throughout lift, transport and placement.
-        transport_rotation = (
-            upright_rotation
-        )
-
-        a_safe_xyz = [
-
-            self.a_grasp_target[0],
-
-            self.a_grasp_target[1],
-
-            self.safe_height,
-        ]
-
-        # Intermediate pre-grasp point.
-        #
-        # The wrist reaches its final grasp orientation here,
-        # while still well above the cube.  The final approach
-        # is therefore a short downward motion instead of a
-        # long joint-space sweep beside the object.
-        # -----------------------------------------------------
-        # A_PREGRASP is intentionally stationary.
-        #
-        # It uses exactly the A_SAFE Cartesian position.
-        # The robot settles here before the ONE final vertical
-        # descent performed by A_PICK.
-        # -----------------------------------------------------
-
-        a_pregrasp_xyz = list(
-            a_safe_xyz
-        )
-
-        # =====================================================
-        # B placement compensation
-        #
-        # point_b is the FIXED desired object position.
-        #
-        # b_release_target is the robot TCP position required
-        # to put the grasped object centre onto point_b.
-        #
-        # The same rigid grasp offset measured at A is retained
-        # because transport_rotation is kept constant.
-        # =====================================================
-
-        self.b_release_target = [
-
-            self.point_b[0]
-            +
-            self.grasp_offset_a[0]
-            +
-            self.placement_offset_b[0],
-
-            self.point_b[1]
-            +
-            self.grasp_offset_a[1]
-            +
-            self.placement_offset_b[1],
-
-            # Preserve the successful A grasp height.
-            #
-            # The old code used point_b.z = 0.028, which
-            # pushed the held cube about 10 mm too low before
-            # release. With the rotational adaptive gripper,
-            # that preload can make the opening linkage push
-            # or throw the object.
-            self.a_grasp_target[2]
-            +
-            self.placement_offset_b[2],
-        ]
-
-        b_safe_xyz = [
-
-            self.b_release_target[0],
-
-            self.b_release_target[1],
-
-            self.safe_height,
-        ]
-
-        self.a_pregrasp = (
-            self.kinematics.solve_pose(
-                a_pregrasp_xyz,
-                transport_rotation,
-                upright_seed(
-                    'a_pregrasp'
-                ),
-                position_tolerance=0.010,
+        self.a_pregrasp_xyz = (
+            self.kinematics.forward_position(
+                self.a_pregrasp
             )
         )
 
-        # -----------------------------------------------------
-        # Lift from A while retaining gripper orientation
-        # -----------------------------------------------------
-
-        self.a_safe = (
-            self.kinematics.solve_pose(
-                a_safe_xyz,
-                transport_rotation,
-                upright_seed(
-                    'a_safe'
-                ),
-
-                # Safe-height waypoint:
-                # exact millimetre positioning is not required.
-                position_tolerance=0.012,
+        self.a_safe_xyz = (
+            self.kinematics.forward_position(
+                self.a_safe
             )
         )
 
-        # -----------------------------------------------------
-        # Move to B at safe height while retaining orientation
-        # -----------------------------------------------------
-
-        self.b_safe = (
-            self.kinematics.solve_pose(
-                b_safe_xyz,
-                transport_rotation,
-                upright_seed(
-                    'b_safe'
-                ),
-
-                # Transfer waypoint above B.
-                # A small XY deviation is acceptable here;
-                # final B_PLACE remains strictly constrained.
-                position_tolerance=0.012,
+        self.b_safe_xyz = (
+            self.kinematics.forward_position(
+                self.b_safe
             )
         )
 
-        # -----------------------------------------------------
-        # Descend vertically to B.
-        #
-        # Same end-effector orientation again.
-        # -----------------------------------------------------
-
-        self.b_place = (
-            self.kinematics.solve_pose(
-                self.b_release_target,
-                transport_rotation,
-                upright_seed(
-                    'b_place'
-                ),
+        self.b_place_xyz = (
+            self.kinematics.forward_position(
+                self.b_place
             )
         )
 
 
-        # =====================================================
-        # Online Cartesian servo targets
-        #
-        # Only the important endpoint poses are solved here.
-        # No dense path is precomputed.
-        # =====================================================
-
-        self.upright_rotation = (
-            transport_rotation
+        self.b_release_target = list(
+            self.b_place_xyz
         )
 
-        self.a_safe_xyz = list(
-            a_safe_xyz
-        )
-
-        self.a_pregrasp_xyz = list(
-            a_pregrasp_xyz
-        )
-
-        self.a_pick_xyz = list(
-            self.a_grasp_target
-        )
-
-        self.b_safe_xyz = list(
-            b_safe_xyz
-        )
-
-        self.b_place_xyz = list(
-            self.b_release_target
-        )
-
-        self.get_logger().info(
-            'Cartesian servo targets ready; '
-            'dense offline IK disabled.'
-        )
-
-
-        self.get_logger().info(
-            'B placement calibration: '
-            f'fixed_B=('
-            f'{self.point_b[0]:.3f}, '
-            f'{self.point_b[1]:.3f}) '
-            f'release_TCP=('
-            f'{self.b_release_target[0]:.3f}, '
-            f'{self.b_release_target[1]:.3f}, '
-            f'{self.b_release_target[2]:.3f}) '
-            f'grasp_offset=('
-            f'{self.grasp_offset_a[0] * 1000:.0f}, '
-            f'{self.grasp_offset_a[1] * 1000:.0f}) mm '
-            f'place_offset=('
-            f'{self.placement_offset_b[0] * 1000:.0f}, '
-            f'{self.placement_offset_b[1] * 1000:.0f}) mm'
-        )
-
-        # -----------------------------------------------------
-        # Final hard validation
-        # -----------------------------------------------------
 
         for name, pose in [
 
@@ -1150,13 +917,13 @@ class TaskManager(Node):
             ),
 
             (
-                'A_PICK',
-                self.a_pick,
+                'A_PREGRASP',
+                self.a_pregrasp,
             ),
 
             (
-                'A_PREGRASP',
-                self.a_pregrasp,
+                'A_PICK',
+                self.a_pick,
             ),
 
             (
@@ -1176,21 +943,24 @@ class TaskManager(Node):
             )
 
             xyz = (
-                self.kinematics.forward_position(
+                self.kinematics
+                .forward_position(
                     pose
                 )
             )
 
             self.get_logger().info(
-                f'Waypoint {name}: '
+                f'Upright waypoint {name}: '
                 f'X={xyz[0]:.3f} '
                 f'Y={xyz[1]:.3f} '
                 f'Z={xyz[2]:.3f}'
             )
 
-    # ========================================================
-    # Start one complete pick-and-place trial
-    # ========================================================
+
+        self.get_logger().info(
+            'STRICT UPRIGHT MODE: '
+            'J4=0, J5=90-J2-J3, J6=J1'
+        )
 
     def task_start_callback(
         self,
@@ -1943,21 +1713,68 @@ class TaskManager(Node):
             )
         )
 
-        pose = [
+        # -----------------------------------------------------
+        # STRICT UPRIGHT INTERPOLATION
+        # -----------------------------------------------------
 
-            self.motion_start_pose[index]
+        q1 = (
+            self.motion_start_pose[0]
             +
             (
-                self.motion_target_pose[index]
+                self.motion_target_pose[0]
                 -
-                self.motion_start_pose[index]
+                self.motion_start_pose[0]
             )
             *
             smooth
+        )
 
-            for index in range(
-                6
+        q2 = (
+            self.motion_start_pose[1]
+            +
+            (
+                self.motion_target_pose[1]
+                -
+                self.motion_start_pose[1]
             )
+            *
+            smooth
+        )
+
+        q3 = (
+            self.motion_start_pose[2]
+            +
+            (
+                self.motion_target_pose[2]
+                -
+                self.motion_start_pose[2]
+            )
+            *
+            smooth
+        )
+
+        pose = [
+
+            q1,
+
+            q2,
+
+            q3,
+
+            # J4
+            0.0,
+
+            # J5
+            (
+                math.pi / 2.0
+                -
+                q2
+                -
+                q3
+            ),
+
+            # J6
+            q1,
         ]
 
         self.publish_joint_command(

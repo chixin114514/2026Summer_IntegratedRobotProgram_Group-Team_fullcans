@@ -1,43 +1,32 @@
 home:
   joints_deg:
-  - 0.0
-  - -20.0
-  - -70.0
-  - 0.0
-  - 90.0
-  - 0.0
+  - 0.0000
+  - 0.2154
+  - -20.4247
+  - 0.0000
+  - 110.2092
+  - 0.0000
 point_a:
-  x: 0.180
-  y: 0.125
-  z:     0.038
+  x: 0.135
+  y: 0.085
+  z: 0.038
 grasp_offset_a:
-  # TCP compensation for mechArm 270 Pi +
-  # myCobot Adaptive Gripper.
-  #
-  # Positive X/Y moves the gripper farther
-  # outward towards the physical cube.
-  x: 0.020
-  y: 0.005
+  # Upright workspace calibration.
+  x: 0.000
+  y: 0.000
   z: 0.000
 
 point_b:
-  x: 0.16
-  y: -0.09
+  x: 0.143
+  y: -0.072
   z: 0.028
 placement_offset_b:
-  # Independent B placement calibration.
-  # A grasp calibration is LOCKED and must not be changed.
-  #
-  # Robot frame:
-  #   +X = forward
-  #   +Y = left
-  #   -Y = right
   x: 0.000
-  y: -0.005
+  y: 0.000
   z: 0.000
 
 safe_height:
-  z: 0.120
+  z: 0.115
 motion:
   simulation_speed_scale: 0.4
   real_speed_scale: 0.2
@@ -61,14 +50,14 @@ motion:
   cartesian_servo_timeout_s: 3.0
   # Hold the grasped object upright at safe height
   # before beginning horizontal transport.
-  post_lift_hold_s: 0.80
+  post_lift_hold_s: 0.0
 
   # Wait after reaching A safe pose.
-  a_safe_hold_s: 0.80
+  a_safe_hold_s: 0.0
 
   # A_PREGRASP is now a stationary settling stage.
   # No downward motion occurs here.
-  pregrasp_hold_s: 0.60
+  pregrasp_hold_s: 0.0
 gripper:
   open_position: 0.0
   closed_position: 0.0120
@@ -93,7 +82,7 @@ kinematics:
   upright_tool_rpy_deg:
   - 180.0
   - 0.0
-  - 90.0
+  - -90.0
 
   # Initial IK seed at A_PICK.
   pick_seed_deg:
@@ -121,44 +110,45 @@ kinematics:
   upright_seed_deg:
 
     a_pick:
-    - 22.9584
-    - 61.3721
-    - -53.6191
-    - 17.5440
-    - 67.3769
-    - 18.2891
+    - 32.1957
+    - 34.3556
+    - -14.1804
+    - 0.0000
+    - 69.8248
+    - 32.1957
 
     a_pregrasp:
-    - 27.4447
-    - 57.3221
-    - -77.0366
-    - 8.9011
-    - 88.6496
-    - 28.8922
+    - 32.1957
+    - 30.9453
+    - -28.9486
+    - 0.0000
+    - 88.0033
+    - 32.1957
 
     a_safe:
-    - 27.4414
-    - 54.7220
-    - -79.4325
-    - 8.9050
-    - 90.8946
-    - 29.4619
+    - 32.1957
+    - 39.4726
+    - -64.2532
+    - 0.0000
+    - 114.7806
+    - 32.1957
 
     b_safe:
-    - -6.3382
-    - 30.7206
-    - -36.4935
-    - -27.7946
-    - 83.2663
-    - -6.0991
+    - -26.7251
+    - 40.0077
+    - -65.0077
+    - 0.0000
+    - 115.0000
+    - -26.7251
 
     b_place:
-    - -16.5821
-    - 52.3508
-    - -41.4833
-    - -13.9324
-    - 74.8277
-    - -13.4263
+    - -26.7251
+    - 34.6830
+    - -14.6877
+    - 0.0000
+    - 70.0047
+    - -26.7251
+
   solver:
     maximum_iterations: 400
     numerical_step_rad: 0.001
@@ -175,8 +165,8 @@ simulation_reset:
   object_name: target_object
   world_name: task2_world
   point_a_world:
-    x: 0.180
-    y: 0.125
+    x: 0.135
+    y: 0.085
     z:     0.415
     roll: 0.0
     pitch: 0.0
