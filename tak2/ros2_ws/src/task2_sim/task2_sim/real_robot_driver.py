@@ -125,21 +125,6 @@ class RealRobotDriver(Node):
             ]
         )
 
-        self.command_period = float(
-            device.get(
-                'command_period_s',
-                0.10,
-            )
-        )
-
-
-        self.final_command_resend = float(
-            device.get(
-                'final_command_resend_s',
-                0.80,
-            )
-        )
-
         self.feedback_period = float(
             device[
                 'feedback_period_s'
@@ -157,30 +142,6 @@ class RealRobotDriver(Node):
         self.last_feedback_success = None
 
         self.consecutive_feedback_errors = 0
-
-        # MechArmSocket / pymycobot may occasionally return
-        # an integer sentinel such as -1 instead of a six-angle
-        # list when a feedback response is not ready.
-        #
-        # This is NOT immediately considered a communication
-        # failure. The sample is simply discarded.
-        self.invalid_feedback_samples = 0
-
-        # -----------------------------------------------------
-        # Latest-command buffer.
-        #
-        # Do NOT queue historical trajectory commands for the
-        # physical arm. Only the newest desired joint target
-        # matters.
-        # -----------------------------------------------------
-
-        self.latest_arm_degrees = None
-
-        self.last_sent_arm_degrees = None
-
-        self.last_arm_send_time = None
-
-        self.arm_command_pending = False
 
         # -----------------------------------------------------
         # Load pymycobot only in REAL mode.
@@ -342,13 +303,7 @@ class RealRobotDriver(Node):
                     'joint_command_topic'
                 ],
                 self.arm_command_callback,
-
-                # Real robot:
-                # KEEP LAST 1.
-                #
-                # Never allow stale joint targets to build up
-                # in the ROS subscriber queue.
-                1,
+                10,
             )
         )
 
@@ -389,24 +344,7 @@ class RealRobotDriver(Node):
             )
         )
 
-        # -----------------------------------------------------
-        # Real communication scheduling.
-        #
-        # Commands and feedback share the same TCP/Pi path.
-        #
-        # Command timer:
-        #   sends only the newest command.
-        #
-        # Feedback timer:
-        #   periodically reads measured joint angles.
-        # -----------------------------------------------------
-
-        self.arm_command_timer = self.create_timer(
-            self.command_period,
-            self.send_latest_arm_command,
-        )
-
-        self.feedback_timer = self.create_timer(
+        self.timer = self.create_timer(
             self.feedback_period,
             self.read_joint_state,
         )
@@ -421,17 +359,6 @@ class RealRobotDriver(Node):
 
         self.get_logger().warn(
             f'Arm speed = {self.arm_speed}%'
-        )
-
-
-        self.get_logger().info(
-            f'Command period = '
-            f'{self.command_period:.2f} s'
-        )
-
-        self.get_logger().info(
-            f'Feedback period = '
-            f'{self.feedback_period:.2f} s'
         )
 
     # ========================================================
@@ -502,124 +429,12 @@ class RealRobotDriver(Node):
             for value in message.data
         ]
 
-        # -----------------------------------------------------
-        # IMPORTANT:
-        #
-        # Do NOT call send_angles() here.
-        #
-        # The ROS callback must remain fast so new messages
-        # cannot accumulate behind a blocking TCP operation.
-        #
-        # Simply replace the previous target with the newest.
-        # -----------------------------------------------------
-
-        self.latest_arm_degrees = list(
-            degrees
-        )
-
-        self.arm_command_pending = True
-
-
-    def send_latest_arm_command(
-        self,
-    ):
-
-        if self.stop_latched:
-
-            return
-
-        if (
-            not self.arm_command_pending
-            or
-            self.latest_arm_degrees is None
-        ):
-
-            return
-
-        degrees = list(
-            self.latest_arm_degrees
-        )
-
-        # Mark consumed BEFORE the blocking network call.
-        #
-        # With queue depth = 1, when the executor becomes free
-        # again it receives only the newest waiting command.
-        self.arm_command_pending = False
-
-
-        # -----------------------------------------------------
-        # Do not repeatedly transmit an identical final target.
-        #
-        # TaskManager intentionally keeps publishing the final
-        # target while waiting for measured convergence.
-        # -----------------------------------------------------
-
-        now_s = (
-            self.get_clock()
-            .now()
-            .nanoseconds
-            *
-            1e-9
-        )
-
-        if (
-            self.last_sent_arm_degrees
-            is not None
-        ):
-
-            maximum_change = max(
-                abs(
-                    current
-                    -
-                    previous
-                )
-                for current, previous
-                in zip(
-                    degrees,
-                    self.last_sent_arm_degrees,
-                )
-            )
-
-            # -------------------------------------------------
-            # Same target:
-            #
-            # Do not send at 10 Hz forever, but also do NOT
-            # suppress it permanently.
-            #
-            # Re-send every ~0.8 s while TaskManager is still
-            # requesting the final target.
-            # -------------------------------------------------
-
-            if maximum_change < 0.01:
-
-                if (
-                    self.last_arm_send_time
-                    is not None
-                    and
-                    (
-                        now_s
-                        -
-                        self.last_arm_send_time
-                    )
-                    <
-                    self.final_command_resend
-                ):
-
-                    return
-
-
         try:
 
             self.robot.send_angles(
                 degrees,
                 self.arm_speed,
             )
-
-            self.last_sent_arm_degrees = list(
-                degrees
-            )
-
-            self.last_arm_send_time = now_s
 
         except Exception as error:
 
@@ -632,7 +447,6 @@ class RealRobotDriver(Node):
                 +
                 str(error)
             )
-
 
     # ========================================================
     # Gripper
@@ -732,33 +546,63 @@ class RealRobotDriver(Node):
 
             return
 
-
-        # =====================================================
-        # Read raw pymycobot feedback
-        # =====================================================
-
         try:
 
             angles = (
                 self.robot.get_angles()
             )
 
-        except Exception as error:
+            if (
+                angles is None
+                or
+                len(angles) != 6
+            ):
 
-            # -------------------------------------------------
-            # A real socket / transport exception.
-            # -------------------------------------------------
+                raise RuntimeError(
+                    'Invalid angle feedback.'
+                )
+
+            message = JointState()
+
+            message.header.stamp = (
+                self.get_clock()
+                .now()
+                .to_msg()
+            )
+
+            message.name = [
+
+                'joint1_to_base',
+                'joint2_to_joint1',
+                'joint3_to_joint2',
+                'joint4_to_joint3',
+                'joint5_to_joint4',
+                'joint6_to_joint5',
+            ]
+
+            message.position = [
+                math.radians(
+                    float(value)
+                )
+                for value in angles
+            ]
+
+            self.joint_state_pub.publish(
+                message
+            )
+
+            self.consecutive_feedback_errors = 0
+
+            self.publish_connection(
+                'CONNECTED'
+            )
+
+        except Exception as error:
 
             self.consecutive_feedback_errors += 1
 
             self.publish_connection(
                 'FEEDBACK_ERROR'
-            )
-
-            self.get_logger().warn(
-                'REAL_FEEDBACK_EXCEPTION: '
-                +
-                str(error)
             )
 
             if (
@@ -772,167 +616,6 @@ class RealRobotDriver(Node):
                     +
                     str(error)
                 )
-
-            return
-
-
-        # =====================================================
-        # IMPORTANT FIX
-        #
-        # pymycobot may return:
-        #
-        #     -1
-        #
-        # or another non-list sentinel when a reply is not
-        # available yet.
-        #
-        # NEVER call len() before checking the type.
-        # =====================================================
-
-        if not isinstance(
-            angles,
-            (
-                list,
-                tuple,
-            ),
-        ):
-
-            self.invalid_feedback_samples += 1
-
-            self.publish_connection(
-                'FEEDBACK_WAIT'
-            )
-
-            # Avoid flooding the terminal.
-            if (
-                self.invalid_feedback_samples == 1
-                or
-                self.invalid_feedback_samples == 5
-                or
-                self.invalid_feedback_samples % 10 == 0
-            ):
-
-                self.get_logger().warn(
-                    'REAL_FEEDBACK_WAIT: '
-                    f'non-list feedback={angles!r} '
-                    f'samples={self.invalid_feedback_samples}'
-                )
-
-            # This sample is simply unavailable.
-            #
-            # Do NOT SAFE_STOP here.
-            # TaskManager has its own measured-feedback
-            # progress / stall watchdog.
-            return
-
-
-        # =====================================================
-        # Sequence must contain exactly six joints
-        # =====================================================
-
-        if len(
-            angles
-        ) != 6:
-
-            self.invalid_feedback_samples += 1
-
-            self.publish_connection(
-                'FEEDBACK_WAIT'
-            )
-
-            self.get_logger().warn(
-                'REAL_FEEDBACK_WAIT: '
-                f'invalid feedback length='
-                f'{len(angles)} '
-                f'raw={angles!r}'
-            )
-
-            return
-
-
-        # =====================================================
-        # Validate every returned angle
-        # =====================================================
-
-        try:
-
-            angle_values = [
-                float(value)
-                for value in angles
-            ]
-
-        except (
-            TypeError,
-            ValueError,
-        ) as error:
-
-            self.invalid_feedback_samples += 1
-
-            self.publish_connection(
-                'FEEDBACK_WAIT'
-            )
-
-            self.get_logger().warn(
-                'REAL_FEEDBACK_WAIT: '
-                f'non-numeric feedback='
-                f'{angles!r}: {error}'
-            )
-
-            return
-
-
-        # =====================================================
-        # Valid feedback
-        # =====================================================
-
-        message = JointState()
-
-        message.header.stamp = (
-            self.get_clock()
-            .now()
-            .to_msg()
-        )
-
-        message.name = [
-
-            'joint1_to_base',
-            'joint2_to_joint1',
-            'joint3_to_joint2',
-            'joint4_to_joint3',
-            'joint5_to_joint4',
-            'joint6_to_joint5',
-        ]
-
-        message.position = [
-
-            math.radians(
-                value
-            )
-
-            for value in angle_values
-        ]
-
-        self.joint_state_pub.publish(
-            message
-        )
-
-        # Successful feedback clears BOTH kinds of error state.
-
-        if self.invalid_feedback_samples > 0:
-
-            self.get_logger().info(
-                'REAL_FEEDBACK_RECOVERED: '
-                f'angles={['%.1f' % value for value in angle_values]}'
-            )
-
-        self.invalid_feedback_samples = 0
-
-        self.consecutive_feedback_errors = 0
-
-        self.publish_connection(
-            'CONNECTED'
-        )
-
 
     # ========================================================
     # Emergency stop
@@ -949,9 +632,6 @@ class RealRobotDriver(Node):
             return
 
         self.stop_latched = True
-
-        self.arm_command_pending = False
-        self.latest_arm_degrees = None
 
         try:
 

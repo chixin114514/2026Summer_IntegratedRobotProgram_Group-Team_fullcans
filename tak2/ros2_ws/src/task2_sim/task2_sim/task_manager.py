@@ -114,35 +114,14 @@ class TaskManager(Node):
             )
         )
 
-        if self.config.is_real_robot:
-
-            robot_feedback_topic = (
-                self.config.communication[
-                    'real'
-                ][
-                    'joint_state_topic'
-                ]
-            )
-
-            robot_feedback_depth = 1
-
-        else:
-
-            robot_feedback_topic = (
-                common[
-                    'robot_state_topic'
-                ]
-            )
-
-            robot_feedback_depth = 10
-
-
         self.robot_state_sub = (
             self.create_subscription(
                 JointState,
-                robot_feedback_topic,
+                common[
+                    'robot_state_topic'
+                ],
                 self.robot_state_callback,
-                robot_feedback_depth,
+                10,
             )
         )
 
@@ -356,66 +335,6 @@ class TaskManager(Node):
             )
         )
 
-
-        real_device = (
-            self.config.device.get(
-                'real',
-                {},
-            )
-        )
-
-        self.real_goal_tolerance = (
-            math.radians(
-                float(
-                    real_device.get(
-                        'goal_tolerance_deg',
-                        2.0,
-                    )
-                )
-            )
-        )
-
-        self.real_goal_required_samples = max(
-            1,
-            int(
-                real_device.get(
-                    'goal_required_samples',
-                    2,
-                )
-            ),
-        )
-
-        self.real_goal_stall_timeout = max(
-            1.0,
-            float(
-                real_device.get(
-                    'goal_stall_timeout_s',
-                    5.0,
-                )
-            ),
-        )
-
-        self.real_goal_absolute_timeout = max(
-            self.real_goal_stall_timeout,
-            float(
-                real_device.get(
-                    'goal_absolute_timeout_s',
-                    30.0,
-                )
-            ),
-        )
-
-        self.real_goal_progress_epsilon = (
-            math.radians(
-                float(
-                    real_device.get(
-                        'goal_progress_epsilon_deg',
-                        0.25,
-                    )
-                )
-            )
-        )
-
         self.home_duration = float(
             motion[
                 'home_duration_s'
@@ -559,22 +478,6 @@ class TaskManager(Node):
         # ====================================================
 
         self.current_joint_state = None
-
-        # Each REAL /joint_states message increments this.
-        #
-        # Goal confirmation counts NEW measured samples,
-        # never repeated reads of one old sample.
-        self.feedback_sequence = 0
-
-        self.motion_goal_last_feedback_sequence = -1
-
-        self.motion_goal_stable_samples = 0
-
-        self.motion_goal_wait_start = None
-
-        self.motion_goal_last_error = float(
-            'inf'
-        )
 
         # The simulated robot is spawned in HOME.
         # Keep the internal command reference consistent with
@@ -1157,9 +1060,6 @@ class TaskManager(Node):
             )
         ]
 
-        self.feedback_sequence += 1
-
-
     def safety_stop_callback(
         self,
         message,
@@ -1392,22 +1292,6 @@ class TaskManager(Node):
         self.motion_duration = max(
             0.5,
             effective_duration,
-        )
-
-        # -----------------------------------------------------
-        # Real-hardware convergence tracking for THIS motion.
-        # -----------------------------------------------------
-
-        self.motion_goal_last_feedback_sequence = (
-            self.feedback_sequence
-        )
-
-        self.motion_goal_stable_samples = 0
-
-        self.motion_goal_wait_start = None
-
-        self.motion_goal_last_error = float(
-            'inf'
         )
 
         self.motion_active = True
@@ -1903,293 +1787,17 @@ class TaskManager(Node):
 
         if progress >= 1.0:
 
-            # -------------------------------------------------
-            # CRITICAL:
-            #
-            # 'pose' is the ACTUAL final command produced by
-            # STRICT UPRIGHT interpolation.
-            #
-            # Do NOT replace it with raw motion_target_pose.
-            # The feedback target must exactly match what we
-            # actually commanded to the physical robot.
-            # -------------------------------------------------
-
-            final_pose = list(
-                pose
-            )
-
             self.commanded_pose = list(
-                final_pose
+                self.motion_target_pose
             )
 
             self.publish_joint_command(
-                final_pose
+                self.commanded_pose
             )
 
+            self.motion_active = False
 
-            # =================================================
-            # SIMULATION
-            # =================================================
-
-            if self.config.is_simulation:
-
-                self.motion_active = False
-
-                return True
-
-
-            # =================================================
-            # REAL ROBOT
-            # =================================================
-
-            now = self.now_seconds()
-
-            if self.motion_goal_wait_start is None:
-
-                self.motion_goal_wait_start = now
-
-                self.motion_goal_target_pose = list(
-                    final_pose
-                )
-
-                self.motion_goal_last_feedback_sequence = (
-                    self.feedback_sequence
-                )
-
-                self.motion_goal_stable_samples = 0
-
-                self.motion_goal_last_error = float(
-                    'inf'
-                )
-
-                self.motion_goal_best_error = float(
-                    'inf'
-                )
-
-                self.motion_goal_last_progress_time = now
-
-                self.motion_goal_last_log_time = 0.0
-
-                self.get_logger().info(
-                    'Real robot: waiting for measured '
-                    'goal convergence.'
-                )
-
-
-            # -------------------------------------------------
-            # Process each NEW measured sample once.
-            # -------------------------------------------------
-
-            if (
-                self.current_joint_state is not None
-                and
-                self.feedback_sequence
-                !=
-                self.motion_goal_last_feedback_sequence
-            ):
-
-                self.motion_goal_last_feedback_sequence = (
-                    self.feedback_sequence
-                )
-
-                joint_errors = [
-
-                    abs(
-                        math.atan2(
-                            math.sin(
-                                measured
-                                -
-                                target
-                            ),
-                            math.cos(
-                                measured
-                                -
-                                target
-                            ),
-                        )
-                    )
-
-                    for measured, target
-                    in zip(
-                        self.current_joint_state,
-                        self.motion_goal_target_pose,
-                    )
-                ]
-
-                maximum_error = max(
-                    joint_errors
-                )
-
-                self.motion_goal_last_error = (
-                    maximum_error
-                )
-
-
-                # ---------------------------------------------
-                # Progress watchdog.
-                #
-                # Any meaningful reduction in error means the
-                # physical robot is still moving correctly.
-                # ---------------------------------------------
-
-                if (
-                    maximum_error
-                    <
-                    (
-                        self.motion_goal_best_error
-                        -
-                        self.real_goal_progress_epsilon
-                    )
-                ):
-
-                    self.motion_goal_best_error = (
-                        maximum_error
-                    )
-
-                    self.motion_goal_last_progress_time = now
-
-
-                # ---------------------------------------------
-                # Arrival confirmation.
-                # ---------------------------------------------
-
-                if (
-                    maximum_error
-                    <=
-                    self.real_goal_tolerance
-                ):
-
-                    self.motion_goal_stable_samples += 1
-
-                else:
-
-                    self.motion_goal_stable_samples = 0
-
-
-                # ---------------------------------------------
-                # Useful 1-Hz diagnostic.
-                # ---------------------------------------------
-
-                if (
-                    now
-                    -
-                    self.motion_goal_last_log_time
-                    >=
-                    1.0
-                ):
-
-                    self.motion_goal_last_log_time = now
-
-                    error_deg = [
-                        round(
-                            math.degrees(value),
-                            1,
-                        )
-                        for value in joint_errors
-                    ]
-
-                    self.get_logger().info(
-                        'REAL_GOAL_PROGRESS '
-                        f'max_error_deg='
-                        f'{math.degrees(maximum_error):.2f} '
-                        f'joint_errors_deg={error_deg}'
-                    )
-
-
-                if (
-                    self.motion_goal_stable_samples
-                    >=
-                    self.real_goal_required_samples
-                ):
-
-                    self.motion_active = False
-
-                    self.get_logger().info(
-                        'Real robot goal confirmed: '
-                        f'max_joint_error_deg='
-                        f'{math.degrees(maximum_error):.2f}'
-                    )
-
-                    return True
-
-
-            # -------------------------------------------------
-            # Stop only if the arm has genuinely stopped
-            # making progress.
-            # -------------------------------------------------
-
-            if (
-                now
-                -
-                self.motion_goal_last_progress_time
-                >=
-                self.real_goal_stall_timeout
-            ):
-
-                if math.isfinite(
-                    self.motion_goal_last_error
-                ):
-
-                    error_description = (
-                        f'{math.degrees(self.motion_goal_last_error):.2f} deg'
-                    )
-
-                else:
-
-                    error_description = (
-                        'no measured feedback'
-                    )
-
-                self.motion_active = False
-
-                self.fail_task(
-                    'REAL_MOTION_STALLED '
-                    f'max_joint_error={error_description}'
-                )
-
-                return False
-
-
-            # -------------------------------------------------
-            # Absolute backstop.
-            # -------------------------------------------------
-
-            if (
-                now
-                -
-                self.motion_goal_wait_start
-                >=
-                self.real_goal_absolute_timeout
-            ):
-
-                if math.isfinite(
-                    self.motion_goal_last_error
-                ):
-
-                    error_description = (
-                        f'{math.degrees(self.motion_goal_last_error):.2f} deg'
-                    )
-
-                else:
-
-                    error_description = (
-                        'no measured feedback'
-                    )
-
-                self.motion_active = False
-
-                self.fail_task(
-                    'REAL_MOTION_ABSOLUTE_TIMEOUT '
-                    f'max_joint_error={error_description}'
-                )
-
-                return False
-
-
-            # Robot is still travelling.
-            # Stay in this state.
-            return False
-
+            return True
 
         return False
 
