@@ -82,7 +82,7 @@ kinematics:
 acceptance:
   settle_time_s: 1.0
   placement_xy_tolerance_m: 0.045
-  simulation_object_center_z_m: 0.420
+  simulation_object_center_z_m: 0.415
   placement_z_tolerance_m: 0.008
   maximum_tilt_deg: 8.0
   object_pose_timeout_s: 1.0
@@ -92,7 +92,7 @@ simulation_reset:
   point_a_world:
     x: 0.195
     y: 0.125
-    z:     0.420
+    z:     0.415
     roll: 0.0
     pitch: 0.0
     yaw: 0.0
