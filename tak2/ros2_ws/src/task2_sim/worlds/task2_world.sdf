@@ -188,7 +188,7 @@
     <model name="target_object">
 
       <pose>
-        0.135 0.085 0.415 0 0 0</pose>
+        0.135 0.075 0.415 0 0 0</pose>
 
       <link name="object_link">
 
