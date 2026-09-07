@@ -366,10 +366,35 @@ class SafetyMonitor(Node):
             message.data.strip()
         )
 
+        # -----------------------------------------------------
+        # Reset the command-step reference at every arm-motion
+        # boundary.
+        #
+        # In REAL mode TaskManager deliberately starts each new
+        # motion from the measured hardware joint state.
+        #
+        # Therefore the first command of a new motion must NOT
+        # be compared with a stale command from the previous
+        # motion state.
+        #
+        # Joint limits, NaN checks and the 3-degree step check
+        # remain active for all following commands.
+        # -----------------------------------------------------
+
         if state in (
             'READY',
             'STARTED',
             'COMPLETED',
+
+            'HOME',
+            'A_SAFE',
+            'A_PREGRASP',
+            'A_PICK',
+            'A_LIFT',
+            'B_SAFE',
+            'B_PLACE',
+            'B_LIFT',
+            'RETURN_HOME',
         ):
 
             self.previous_command = None
