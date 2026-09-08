@@ -25,3 +25,11 @@ real:
   arm_speed_percent: 20
   gripper_speed_percent: 20
   feedback_period_s: 0.25
+
+  # High-level serial action queue for the physical robot.
+  #
+  # Only ONE complete action is sent at a time.
+  # No trajectory-point backlog is allowed.
+  queued_execution: true
+  motion_settle_s: 0.80
+  gripper_settle_s: 0.70

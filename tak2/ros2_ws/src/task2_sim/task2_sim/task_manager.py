@@ -359,6 +359,55 @@ class TaskManager(Node):
             )
         )
 
+
+        # ====================================================
+        # REAL ROBOT HIGH-LEVEL ACTION QUEUE
+        #
+        # The task sequence itself is the queue:
+        #
+        # HOME -> A_SAFE -> A_PREGRASP -> A_PICK -> ...
+        #
+        # In REAL mode we send exactly ONE target per state.
+        # The next state cannot publish until this state's
+        # execution window has expired.
+        #
+        # Simulation keeps the existing smooth trajectory.
+        # ====================================================
+
+        real_device = (
+            self.config.device.get(
+                'real',
+                {},
+            )
+        )
+
+        self.real_queued_execution = bool(
+            real_device.get(
+                'queued_execution',
+                True,
+            )
+        )
+
+        self.real_motion_settle = max(
+            0.0,
+            float(
+                real_device.get(
+                    'motion_settle_s',
+                    0.80,
+                )
+            ),
+        )
+
+        self.real_gripper_settle = max(
+            0.0,
+            float(
+                real_device.get(
+                    'gripper_settle_s',
+                    0.70,
+                )
+            ),
+        )
+
         self.home_duration = float(
             motion[
                 'home_duration_s'
@@ -774,6 +823,22 @@ class TaskManager(Node):
             'Same task logic will be used '
             'for simulation and real robot.'
         )
+
+
+        if (
+            self.config.is_real_robot
+            and
+            self.real_queued_execution
+        ):
+
+            self.get_logger().info(
+                'REAL EXECUTION = SERIAL ACTION QUEUE'
+            )
+
+            self.get_logger().info(
+                'One state -> one hardware command -> '
+                'wait -> next state'
+            )
 
         self.get_logger().info(
             '========================================'
@@ -1899,10 +1964,66 @@ class TaskManager(Node):
 
             try:
 
-                self.start_motion(
-                    target,
-                    duration,
-                )
+                # =============================================
+                # REAL ROBOT:
+                # HIGH-LEVEL SERIAL ACTION QUEUE
+                #
+                # Exactly ONE target is sent for this state.
+                # No intermediate trajectory points are sent.
+                # =============================================
+
+                if (
+                    self.config.is_real_robot
+                    and
+                    self.real_queued_execution
+                ):
+
+                    self.validate_pose_if_enabled(
+                        target
+                    )
+
+                    effective_duration = max(
+                        0.5,
+                        float(duration)
+                        *
+                        self.real_motion_duration_scale,
+                    )
+
+                    self.publish_joint_command(
+                        target
+                    )
+
+                    self.commanded_pose = list(
+                        target
+                    )
+
+                    self.motion_active = False
+
+                    self.hold_until = (
+                        self.now_seconds()
+                        +
+                        effective_duration
+                        +
+                        self.real_motion_settle
+                    )
+
+                    self.get_logger().info(
+                        'REAL_QUEUE START: '
+                        f'{name} '
+                        f'execution_window='
+                        f'{effective_duration:.2f}s '
+                        f'settle='
+                        f'{self.real_motion_settle:.2f}s'
+                    )
+
+                else:
+
+                    # Simulation keeps the proven smooth
+                    # interpolation path.
+                    self.start_motion(
+                        target,
+                        duration,
+                    )
 
             except KinematicsError as error:
 
@@ -1935,15 +2056,44 @@ class TaskManager(Node):
 
         elif state_type == 'gripper':
 
+            # One command on entry.
             self.publish_gripper_command(
                 target
+            )
+
+            extra_settle = (
+                self.real_gripper_settle
+                if (
+                    self.config.is_real_robot
+                    and
+                    self.real_queued_execution
+                )
+                else
+                0.0
             )
 
             self.hold_until = (
                 self.now_seconds()
                 +
                 hold_time
+                +
+                extra_settle
             )
+
+            if (
+                self.config.is_real_robot
+                and
+                self.real_queued_execution
+            ):
+
+                self.get_logger().info(
+                    'REAL_QUEUE START: '
+                    f'{name} '
+                    f'gripper_window='
+                    f'{hold_time:.2f}s '
+                    f'settle='
+                    f'{extra_settle:.2f}s'
+                )
 
         else:
 
@@ -1995,6 +2145,49 @@ class TaskManager(Node):
         # -----------------------------------------------------
 
         if state_type == 'motion':
+
+            # =================================================
+            # REAL QUEUED EXECUTION
+            #
+            # The target was sent exactly once in start_state().
+            #
+            # Until the action deadline expires:
+            #     - no later state can start
+            #     - no new arm target is published
+            #     - no old trajectory point can accumulate
+            # =================================================
+
+            if (
+                self.config.is_real_robot
+                and
+                self.real_queued_execution
+            ):
+
+                if (
+                    self.now_seconds()
+                    <
+                    self.hold_until
+                ):
+
+                    return
+
+                self.get_logger().info(
+                    f'REAL_QUEUE DONE: {name}'
+                )
+
+                self.get_logger().info(
+                    f'Reached: {name}'
+                )
+
+                self.finish_state()
+
+                return
+
+
+            # =================================================
+            # SIMULATION
+            # Existing smooth trajectory behaviour.
+            # =================================================
 
             if self.motion_active:
 
@@ -2079,6 +2272,41 @@ class TaskManager(Node):
         # -----------------------------------------------------
 
         if state_type == 'gripper':
+
+            # =================================================
+            # REAL:
+            # command was sent once in start_state().
+            # Never flood the physical gripper with repeats.
+            # =================================================
+
+            if (
+                self.config.is_real_robot
+                and
+                self.real_queued_execution
+            ):
+
+                if (
+                    self.now_seconds()
+                    <
+                    self.hold_until
+                ):
+
+                    return
+
+                self.get_logger().info(
+                    f'REAL_QUEUE DONE: {name}'
+                )
+
+                self.finish_state()
+
+                return
+
+
+            # =================================================
+            # SIM:
+            # keep publishing the desired position so Gazebo's
+            # finger controllers continue holding it.
+            # =================================================
 
             gripper_target = (
                 self.sequence[

@@ -260,12 +260,12 @@ class RealRobotDriver(Node):
             ):
 
                 self.robot.set_fresh_mode(
-                    1
+                    0
                 )
 
                 self.get_logger().info(
-                    'Real robot fresh mode = 1 '
-                    '(latest command first)'
+                    'Real robot fresh mode = 0 '
+                    '(ordered command execution)'
                 )
 
         except Exception as error:
