@@ -1,4 +1,5 @@
 import rclpy
+from rclpy.executors import ExternalShutdownException
 
 from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
@@ -32,6 +33,13 @@ class GripperInterface(Node):
             ]
         )
 
+
+        self.command_queue_depth = (
+            10
+            if self.config.is_simulation
+            else 1
+        )
+
         self.command_sub = (
             self.create_subscription(
                 Float64,
@@ -39,7 +47,7 @@ class GripperInterface(Node):
                     'gripper_command_topic'
                 ],
                 self.command_callback,
-                10,
+                self.command_queue_depth,
             )
         )
 
@@ -138,7 +146,7 @@ class GripperInterface(Node):
                     real[
                         'gripper_command_topic'
                     ],
-                    10,
+                    1,
                 )
             )
 
@@ -239,14 +247,15 @@ def main(args=None):
             node
         )
 
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
 
         pass
 
     finally:
 
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

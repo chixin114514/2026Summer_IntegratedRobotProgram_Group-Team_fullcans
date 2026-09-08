@@ -1,6 +1,7 @@
 import math
 
 import rclpy
+from rclpy.executors import ExternalShutdownException
 
 from ament_index_python.packages import (
     get_package_share_directory,
@@ -52,6 +53,17 @@ class TaskManager(Node):
 
         self.config = Task2Config(
             config_dir
+        )
+
+
+        self.software_safety_enabled = bool(
+            self.config.safety.get(
+                'motion',
+                {},
+            ).get(
+                'software_safety_enabled',
+                True,
+            )
         )
 
         self.kinematics = (
@@ -121,6 +133,18 @@ class TaskManager(Node):
                     'robot_state_topic'
                 ],
                 self.robot_state_callback,
+                10,
+            )
+        )
+
+
+        self.robot_state_source_sub = (
+            self.create_subscription(
+                String,
+                common[
+                    'robot_state_source_topic'
+                ],
+                self.robot_state_source_callback,
                 10,
             )
         )
@@ -479,6 +503,8 @@ class TaskManager(Node):
 
         self.current_joint_state = None
 
+        self.robot_state_source = 'UNKNOWN'
+
         # The simulated robot is spawned in HOME.
         # Keep the internal command reference consistent with
         # that physical initial configuration.
@@ -700,11 +726,22 @@ class TaskManager(Node):
         #
         # small incremental commands are required because
         # safety_monitor rejects large instantaneous changes.
+        self.control_period = (
+            0.05
+            if self.config.is_simulation
+            else 0.10
+        )
+
         self.timer = (
             self.create_timer(
-                0.05,
+                self.control_period,
                 self.update,
             )
+        )
+
+        self.get_logger().info(
+            'Task control rate: '
+            f'{1.0 / self.control_period:.1f} Hz'
         )
 
         self.ready_announce_count = 0
@@ -793,6 +830,24 @@ class TaskManager(Node):
         )
 
     # ========================================================
+    # Optional software pose validation
+    # ========================================================
+
+    def validate_pose_if_enabled(
+        self,
+        pose,
+    ):
+
+        if not self.software_safety_enabled:
+
+            return
+
+        self.kinematics.validate_joints(
+            pose
+        )
+
+
+    # ========================================================
     # Pre-compute task waypoints
     # ========================================================
 
@@ -840,7 +895,7 @@ class TaskManager(Node):
                 )
             )
 
-            self.kinematics.validate_joints(
+            self.validate_pose_if_enabled(
                 pose
             )
 
@@ -938,7 +993,7 @@ class TaskManager(Node):
 
         ]:
 
-            self.kinematics.validate_joints(
+            self.validate_pose_if_enabled(
                 pose
             )
 
@@ -958,8 +1013,8 @@ class TaskManager(Node):
 
 
         self.get_logger().info(
-            'STRICT UPRIGHT MODE: '
-            'J4=0, J5=90-J2-J3, J6=J1'
+            'CALIBRATED WAYPOINT MODE: '
+            'all six configured joint angles are respected'
         )
 
     def task_start_callback(
@@ -1040,6 +1095,16 @@ class TaskManager(Node):
     # Robot / safety feedback
     # ========================================================
 
+    def robot_state_source_callback(
+        self,
+        message,
+    ):
+
+        self.robot_state_source = (
+            message.data.strip()
+        )
+
+
     def robot_state_callback(
         self,
         message,
@@ -1048,6 +1113,18 @@ class TaskManager(Node):
         if len(
             message.position
         ) < 6:
+
+            return
+
+        # Real mode must only use PHYSICAL measured feedback.
+        # Never mistake COMMAND_FALLBACK for actual robot pose.
+        if (
+            self.config.is_real_robot
+            and
+            self.robot_state_source
+            !=
+            'MEASURED'
+        ):
 
             return
 
@@ -1158,7 +1235,7 @@ class TaskManager(Node):
 
         try:
 
-            self.kinematics.validate_joints(
+            self.validate_pose_if_enabled(
                 pose
             )
 
@@ -1257,11 +1334,11 @@ class TaskManager(Node):
                 self.commanded_pose
             )
 
-        self.kinematics.validate_joints(
+        self.validate_pose_if_enabled(
             start_pose
         )
 
-        self.kinematics.validate_joints(
+        self.validate_pose_if_enabled(
             target
         )
 
@@ -1355,7 +1432,7 @@ class TaskManager(Node):
                 self.commanded_pose
             )
 
-        self.kinematics.validate_joints(
+        self.validate_pose_if_enabled(
             start_pose
         )
 
@@ -1637,7 +1714,7 @@ class TaskManager(Node):
 
         try:
 
-            self.kinematics.validate_joints(
+            self.validate_pose_if_enabled(
                 next_pose
             )
 
@@ -1714,67 +1791,32 @@ class TaskManager(Node):
         )
 
         # -----------------------------------------------------
-        # STRICT UPRIGHT INTERPOLATION
+        # SIX-JOINT CALIBRATED INTERPOLATION
+        #
+        # Respect all six manually calibrated waypoint angles.
+        #
+        # The previous implementation overwrote J4/J5/J6 on
+        # every tick and then snapped back to the configured
+        # target on the last tick. That could create a sudden
+        # physical jump and made manual J4/J5/J6 tuning partly
+        # ineffective.
         # -----------------------------------------------------
-
-        q1 = (
-            self.motion_start_pose[0]
-            +
-            (
-                self.motion_target_pose[0]
-                -
-                self.motion_start_pose[0]
-            )
-            *
-            smooth
-        )
-
-        q2 = (
-            self.motion_start_pose[1]
-            +
-            (
-                self.motion_target_pose[1]
-                -
-                self.motion_start_pose[1]
-            )
-            *
-            smooth
-        )
-
-        q3 = (
-            self.motion_start_pose[2]
-            +
-            (
-                self.motion_target_pose[2]
-                -
-                self.motion_start_pose[2]
-            )
-            *
-            smooth
-        )
 
         pose = [
 
-            q1,
-
-            q2,
-
-            q3,
-
-            # J4
-            0.0,
-
-            # J5
+            self.motion_start_pose[index]
+            +
             (
-                math.pi / 2.0
+                self.motion_target_pose[index]
                 -
-                q2
-                -
-                q3
-            ),
+                self.motion_start_pose[index]
+            )
+            *
+            smooth
 
-            # J6
-            q1,
+            for index in range(
+                6
+            )
         ]
 
         self.publish_joint_command(
@@ -1787,12 +1829,11 @@ class TaskManager(Node):
 
         if progress >= 1.0:
 
+            # 'pose' is already exactly the interpolated final
+            # target at progress == 1.0. Keep the same command
+            # instead of replacing it with another branch.
             self.commanded_pose = list(
-                self.motion_target_pose
-            )
-
-            self.publish_joint_command(
-                self.commanded_pose
+                pose
             )
 
             self.motion_active = False
@@ -2078,7 +2119,7 @@ def main(args=None):
             node
         )
 
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
 
         pass
 
@@ -2086,7 +2127,8 @@ def main(args=None):
 
         node.destroy_node()
 
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

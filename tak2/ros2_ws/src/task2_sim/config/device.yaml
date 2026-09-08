@@ -24,4 +24,4 @@ real:
   robot_port: 9000
   arm_speed_percent: 20
   gripper_speed_percent: 20
-  feedback_period_s: 0.05
+  feedback_period_s: 0.25

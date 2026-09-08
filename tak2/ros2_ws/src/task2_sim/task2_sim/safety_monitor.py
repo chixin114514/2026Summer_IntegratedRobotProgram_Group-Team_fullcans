@@ -1,6 +1,7 @@
 import math
 
 import rclpy
+from rclpy.executors import ExternalShutdownException
 
 from ament_index_python.packages import (
     get_package_share_directory,
@@ -488,6 +489,42 @@ class SafetyMonitor(Node):
 
             return
 
+        # =====================================================
+        # SOFTWARE SAFETY BYPASS PASS-THROUGH
+        #
+        # IMPORTANT:
+        #
+        # The previous implementation ignored trigger_stop(),
+        # but then returned from command_callback anyway.
+        # That silently DROPPED valid robot commands.
+        #
+        # In commissioning mode a valid finite six-joint
+        # command must be forwarded immediately.
+        # =====================================================
+
+        if not self.software_safety_enabled:
+
+            validated = Float64MultiArray()
+
+            validated.data = list(
+                values
+            )
+
+            self.validated_command_pub.publish(
+                validated
+            )
+
+            self.previous_command = list(
+                values
+            )
+
+            self.publish_state(
+                'OK'
+            )
+
+            return
+
+
         # -----------------------------------------------------
         # Check 3: hard joint limits
         # -----------------------------------------------------
@@ -607,7 +644,7 @@ def main(args=None):
             node
         )
 
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
 
         pass
 
@@ -615,7 +652,8 @@ def main(args=None):
 
         node.destroy_node()
 
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

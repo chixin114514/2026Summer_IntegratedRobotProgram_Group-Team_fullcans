@@ -1,6 +1,7 @@
 import math
 
 import rclpy
+from rclpy.executors import ExternalShutdownException
 
 from ament_index_python.packages import (
     get_package_share_directory,
@@ -45,6 +46,14 @@ class ArmInterface(Node):
 
         self.mode = self.config.mode
 
+
+        # Real hardware must never accumulate stale commands.
+        self.command_queue_depth = (
+            10
+            if self.config.is_simulation
+            else 1
+        )
+
         # -----------------------------------------------------
         # Unified upper-level command
         # -----------------------------------------------------
@@ -56,7 +65,7 @@ class ArmInterface(Node):
                     'arm_command_topic'
                 ],
                 self.command_callback,
-                10,
+                self.command_queue_depth,
             )
         )
 
@@ -117,7 +126,7 @@ class ArmInterface(Node):
                 self.create_publisher(
                     Float64MultiArray,
                     str(real_topic),
-                    10,
+                    1,
                 )
             )
 
@@ -198,7 +207,7 @@ def main(args=None):
             node
         )
 
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
 
         pass
 
@@ -206,7 +215,8 @@ def main(args=None):
 
         node.destroy_node()
 
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

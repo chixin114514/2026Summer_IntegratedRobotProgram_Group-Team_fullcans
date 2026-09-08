@@ -8,6 +8,7 @@ from http.server import (
 from pathlib import Path
 
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 
 from std_msgs.msg import Float64
@@ -1562,7 +1563,7 @@ def main(args=None):
             tuner
         )
 
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
 
         pass
 
@@ -1572,7 +1573,8 @@ def main(args=None):
 
         tuner.destroy_node()
 
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

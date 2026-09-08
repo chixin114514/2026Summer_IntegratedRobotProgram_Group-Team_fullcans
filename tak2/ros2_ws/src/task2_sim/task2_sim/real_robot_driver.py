@@ -1,6 +1,7 @@
 import math
 
 import rclpy
+from rclpy.executors import ExternalShutdownException
 
 from ament_index_python.packages import (
     get_package_share_directory,
@@ -64,6 +65,17 @@ class RealRobotDriver(Node):
             self.config.device[
                 'real'
             ]
+        )
+
+
+        self.software_safety_enabled = bool(
+            self.config.safety.get(
+                'motion',
+                {},
+            ).get(
+                'software_safety_enabled',
+                True,
+            )
         )
 
         # -----------------------------------------------------
@@ -142,6 +154,11 @@ class RealRobotDriver(Node):
         self.last_feedback_success = None
 
         self.consecutive_feedback_errors = 0
+
+
+        self.invalid_feedback_samples = 0
+
+        self.last_gripper_device_value = None
 
         # -----------------------------------------------------
         # Load pymycobot only in REAL mode.
@@ -303,7 +320,7 @@ class RealRobotDriver(Node):
                     'joint_command_topic'
                 ],
                 self.arm_command_callback,
-                10,
+                1,
             )
         )
 
@@ -314,7 +331,7 @@ class RealRobotDriver(Node):
                     'gripper_command_topic'
                 ],
                 self.gripper_command_callback,
-                10,
+                1,
             )
         )
 
@@ -520,12 +537,32 @@ class RealRobotDriver(Node):
             )
         )
 
+        # Repeated physical gripper command suppression.
+        #
+        # TaskManager intentionally republishes gripper targets
+        # for Gazebo. Do not send the same hardware command to
+        # the Pi over and over again.
+        if (
+            self.last_gripper_device_value
+            is not None
+            and
+            device_value
+            ==
+            self.last_gripper_device_value
+        ):
+
+            return
+
         try:
 
             self.robot.set_gripper_value(
                 device_value,
                 self.gripper_speed,
                 1,  # Adaptive Gripper
+            )
+
+            self.last_gripper_device_value = (
+                device_value
             )
 
         except Exception as error:
@@ -546,55 +583,11 @@ class RealRobotDriver(Node):
 
             return
 
+
         try:
 
-            angles = (
+            raw_angles = (
                 self.robot.get_angles()
-            )
-
-            if (
-                angles is None
-                or
-                len(angles) != 6
-            ):
-
-                raise RuntimeError(
-                    'Invalid angle feedback.'
-                )
-
-            message = JointState()
-
-            message.header.stamp = (
-                self.get_clock()
-                .now()
-                .to_msg()
-            )
-
-            message.name = [
-
-                'joint1_to_base',
-                'joint2_to_joint1',
-                'joint3_to_joint2',
-                'joint4_to_joint3',
-                'joint5_to_joint4',
-                'joint6_to_joint5',
-            ]
-
-            message.position = [
-                math.radians(
-                    float(value)
-                )
-                for value in angles
-            ]
-
-            self.joint_state_pub.publish(
-                message
-            )
-
-            self.consecutive_feedback_errors = 0
-
-            self.publish_connection(
-                'CONNECTED'
             )
 
         except Exception as error:
@@ -605,10 +598,24 @@ class RealRobotDriver(Node):
                 'FEEDBACK_ERROR'
             )
 
+            # Do not kill commissioning runs because one
+            # socket/serial feedback request was late.
             if (
-                self.consecutive_feedback_errors
-                >=
-                3
+                self.consecutive_feedback_errors == 1
+                or
+                self.consecutive_feedback_errors % 10 == 0
+            ):
+
+                self.get_logger().warn(
+                    'REAL_FEEDBACK_EXCEPTION: '
+                    +
+                    str(error)
+                )
+
+            if (
+                self.software_safety_enabled
+                and
+                self.consecutive_feedback_errors >= 10
             ):
 
                 self.publish_fault(
@@ -616,6 +623,155 @@ class RealRobotDriver(Node):
                     +
                     str(error)
                 )
+
+            return
+
+
+        # -----------------------------------------------------
+        # pymycobot socket may transiently return:
+        #
+        #   -1
+        #   None
+        #   other non-sequence sentinel values
+        #
+        # Never call len() before checking the type.
+        # -----------------------------------------------------
+
+        if not isinstance(
+            raw_angles,
+            (
+                list,
+                tuple,
+            ),
+        ):
+
+            self.invalid_feedback_samples += 1
+
+            self.publish_connection(
+                'FEEDBACK_WAIT'
+            )
+
+            if (
+                self.invalid_feedback_samples == 1
+                or
+                self.invalid_feedback_samples % 10 == 0
+            ):
+
+                self.get_logger().warn(
+                    'REAL_FEEDBACK_WAIT: '
+                    f'raw={raw_angles!r}'
+                )
+
+            return
+
+
+        if len(raw_angles) != 6:
+
+            self.invalid_feedback_samples += 1
+
+            self.publish_connection(
+                'FEEDBACK_WAIT'
+            )
+
+            if (
+                self.invalid_feedback_samples == 1
+                or
+                self.invalid_feedback_samples % 10 == 0
+            ):
+
+                self.get_logger().warn(
+                    'REAL_FEEDBACK_WAIT: '
+                    f'expected 6 angles, '
+                    f'got {len(raw_angles)}'
+                )
+
+            return
+
+
+        try:
+
+            angles = [
+                float(value)
+                for value in raw_angles
+            ]
+
+        except (
+            TypeError,
+            ValueError,
+        ) as error:
+
+            self.invalid_feedback_samples += 1
+
+            self.get_logger().warn(
+                'REAL_FEEDBACK_WAIT: '
+                f'non-numeric feedback: {error}'
+            )
+
+            return
+
+
+        if not all(
+            math.isfinite(value)
+            for value in angles
+        ):
+
+            self.invalid_feedback_samples += 1
+
+            self.get_logger().warn(
+                'REAL_FEEDBACK_WAIT: '
+                'non-finite angle feedback'
+            )
+
+            return
+
+
+        message = JointState()
+
+        message.header.stamp = (
+            self.get_clock()
+            .now()
+            .to_msg()
+        )
+
+        message.name = [
+
+            'joint1_to_base',
+            'joint2_to_joint1',
+            'joint3_to_joint2',
+            'joint4_to_joint3',
+            'joint5_to_joint4',
+            'joint6_to_joint5',
+        ]
+
+        message.position = [
+            math.radians(
+                value
+            )
+            for value in angles
+        ]
+
+        self.joint_state_pub.publish(
+            message
+        )
+
+        if (
+            self.invalid_feedback_samples > 0
+            or
+            self.consecutive_feedback_errors > 0
+        ):
+
+            self.get_logger().info(
+                'REAL_FEEDBACK_RECOVERED'
+            )
+
+        self.invalid_feedback_samples = 0
+
+        self.consecutive_feedback_errors = 0
+
+        self.publish_connection(
+            'CONNECTED'
+        )
+
 
     # ========================================================
     # Emergency stop
@@ -698,7 +854,7 @@ def main(args=None):
             node
         )
 
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
 
         pass
 
@@ -706,7 +862,8 @@ def main(args=None):
 
         node.destroy_node()
 
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

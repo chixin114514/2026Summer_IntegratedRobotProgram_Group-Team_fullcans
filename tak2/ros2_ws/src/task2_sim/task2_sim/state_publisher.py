@@ -1,4 +1,5 @@
 import rclpy
+from rclpy.executors import ExternalShutdownException
 
 from ament_index_python.packages import (
     get_package_share_directory,
@@ -95,7 +96,11 @@ class Task2StatePublisher(Node):
 
         self.last_feedback_time = None
 
-        self.feedback_timeout_s = 0.50
+        self.feedback_timeout_s = (
+            0.50
+            if self.config.is_simulation
+            else 1.00
+        )
 
         # -----------------------------------------------------
         # Output
@@ -337,18 +342,21 @@ class Task2StatePublisher(Node):
 
         state.position = positions
 
-        self.robot_state_pub.publish(
-            state
-        )
-
         source_message = String()
 
         source_message.data = (
             source
         )
 
+        # Publish source first so downstream real-robot logic
+        # knows whether the following JointState is measured
+        # or merely a command fallback.
         self.source_pub.publish(
             source_message
+        )
+
+        self.robot_state_pub.publish(
+            state
         )
 
 
@@ -366,7 +374,7 @@ def main(args=None):
             node
         )
 
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
 
         pass
 
@@ -374,7 +382,8 @@ def main(args=None):
 
         node.destroy_node()
 
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':
