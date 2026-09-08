@@ -1,3 +1,4 @@
+import math
 import subprocess
 
 import rclpy
@@ -11,6 +12,7 @@ from rclpy.node import Node
 
 from std_msgs.msg import (
     Bool,
+    Float64MultiArray,
     String,
 )
 
@@ -45,6 +47,68 @@ class TrialResetInterface(Node):
         )
 
         task = self.config.task
+
+        # =====================================================
+        # Real-robot reset configuration
+        #
+        # Physical reset consists of:
+        #
+        #   1. command robot back to HOME
+        #   2. operator restores the physical object to A
+        #   3. publish trial_reset_done only after BOTH finish
+        # =====================================================
+
+        self.real_home = [
+            math.radians(
+                float(value)
+            )
+            for value in task[
+                'home'
+            ][
+                'joints_deg'
+            ]
+        ]
+
+        motion = task[
+            'motion'
+        ]
+
+        real_device = (
+            self.config.device.get(
+                'real',
+                {},
+            )
+        )
+
+        calculated_home_wait = (
+            float(
+                motion.get(
+                    'home_duration_s',
+                    1.5,
+                )
+            )
+            *
+            float(
+                motion.get(
+                    'real_motion_duration_scale',
+                    1.0,
+                )
+            )
+            +
+            float(
+                real_device.get(
+                    'motion_settle_s',
+                    0.5,
+                )
+            )
+        )
+
+        # The real arm currently runs at low speed.
+        # Give HOME enough time during acceptance reset.
+        self.real_home_wait_s = max(
+            5.0,
+            calculated_home_wait,
+        )
 
         simulation_reset = (
             task[
@@ -90,6 +154,16 @@ class TrialResetInterface(Node):
 
         self.waiting_for_operator = False
 
+        self.operator_ready = False
+
+        self.real_home_command_pending = False
+
+        self.real_home_command_time = 0.0
+
+        self.real_home_pending = False
+
+        self.real_home_done_time = 0.0
+
         self.pending_sim_done = False
 
         self.sim_done_time = 0.0
@@ -103,6 +177,30 @@ class TrialResetInterface(Node):
                 Bool,
                 common[
                     'trial_reset_done_topic'
+                ],
+                10,
+            )
+        )
+
+        # Real HOME reset goes through the normal Task2
+        # arm command -> safety monitor -> arm interface path.
+        self.real_home_pub = (
+            self.create_publisher(
+                Float64MultiArray,
+                common[
+                    'requested_arm_command_topic'
+                ],
+                10,
+            )
+        )
+
+        # RESET_HOME is also visible in the normal task-state
+        # stream for logging and safety synchronisation.
+        self.task_state_pub = (
+            self.create_publisher(
+                String,
+                common[
+                    'task_state_topic'
                 ],
                 10,
             )
@@ -232,21 +330,78 @@ class TrialResetInterface(Node):
 
         else:
 
+            # =================================================
+            # REAL ROBOT RESET
+            #
+            # Do not immediately declare reset complete.
+            #
+            # Condition A:
+            #     robot HOME reset complete
+            #
+            # Condition B:
+            #     operator confirms object restored to A
+            #
+            # Only A + B -> trial_reset_done
+            # =================================================
+
             self.waiting_for_operator = True
 
-            self.get_logger().warn(
-                'REAL ROBOT: place the physical object '
-                'back at point A.'
+            self.operator_ready = False
+
+            self.real_home_pending = False
+
+            # Publish RESET_HOME first. The actual HOME command
+            # is sent 0.20 s later so safety_monitor has time to
+            # reset its command-step reference.
+            self.real_home_command_pending = True
+
+            self.real_home_command_time = (
+                self.now_seconds()
+                +
+                0.20
+            )
+
+            state = String()
+
+            state.data = 'RESET_HOME'
+
+            self.task_state_pub.publish(
+                state
             )
 
             self.get_logger().warn(
-                'After the object is ready, run:'
+                '========================================'
+            )
+
+            self.get_logger().warn(
+                'REAL ROBOT RESET STARTED'
+            )
+
+            self.get_logger().warn(
+                'Robot will automatically return to HOME.'
+            )
+
+            self.get_logger().warn(
+                'Place the physical object back at point A.'
+            )
+
+            self.get_logger().warn(
+                'After the object is ready, confirm with:'
             )
 
             self.get_logger().warn(
                 'ros2 topic pub --once '
                 '/task2/operator_reset_done '
                 'std_msgs/msg/Bool "{data: true}"'
+            )
+
+            self.get_logger().warn(
+                'Next trial starts only after HOME + '
+                'object reset are both complete.'
+            )
+
+            self.get_logger().warn(
+                '========================================'
             )
 
     # ========================================================
@@ -396,7 +551,51 @@ class TrialResetInterface(Node):
 
             return
 
+        self.operator_ready = True
+
+        self.get_logger().info(
+            'REAL ROBOT RESET: '
+            'operator confirmed object at point A.'
+        )
+
+        self.try_finish_real_reset()
+
+    # ========================================================
+    # Real reset completion
+    # ========================================================
+
+    def try_finish_real_reset(
+        self,
+    ):
+
+        if not self.config.is_real_robot:
+
+            return
+
+        if not self.waiting_for_operator:
+
+            return
+
+        if not self.operator_ready:
+
+            return
+
+        if self.real_home_command_pending:
+
+            return
+
+        if self.real_home_pending:
+
+            return
+
         self.waiting_for_operator = False
+
+        self.operator_ready = False
+
+        self.get_logger().info(
+            'REAL ROBOT RESET COMPLETE: '
+            'HOME reached and object confirmed at A.'
+        )
 
         self.publish_reset_done()
 
@@ -406,12 +605,84 @@ class TrialResetInterface(Node):
 
     def update(self):
 
+        now = self.now_seconds()
+
+        # =====================================================
+        # REAL ROBOT
+        # =====================================================
+
+        if self.config.is_real_robot:
+
+            # Send HOME once after RESET_HOME state has had
+            # time to propagate through ROS2.
+            if (
+                self.real_home_command_pending
+                and
+                now
+                >=
+                self.real_home_command_time
+            ):
+
+                command = Float64MultiArray()
+
+                command.data = list(
+                    self.real_home
+                )
+
+                self.real_home_pub.publish(
+                    command
+                )
+
+                self.real_home_command_pending = False
+
+                self.real_home_pending = True
+
+                self.real_home_done_time = (
+                    now
+                    +
+                    self.real_home_wait_s
+                )
+
+                self.get_logger().info(
+                    'REAL ROBOT RESET: '
+                    'HOME command sent.'
+                )
+
+                self.get_logger().info(
+                    'REAL ROBOT RESET: '
+                    f'waiting {self.real_home_wait_s:.2f}s '
+                    'for HOME motion.'
+                )
+
+            if (
+                self.real_home_pending
+                and
+                now
+                >=
+                self.real_home_done_time
+            ):
+
+                self.real_home_pending = False
+
+                self.get_logger().info(
+                    'REAL ROBOT RESET: '
+                    'HOME motion window complete.'
+                )
+
+                self.try_finish_real_reset()
+
+            return
+
+        # =====================================================
+        # SIMULATION
+        # =====================================================
+
         if not self.pending_sim_done:
 
             return
 
         if (
-            self.now_seconds()
+            now
             <
             self.sim_done_time
         ):

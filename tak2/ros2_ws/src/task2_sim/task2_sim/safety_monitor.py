@@ -421,6 +421,7 @@ class SafetyMonitor(Node):
             'READY',
             'STARTED',
             'COMPLETED',
+            'RESET_HOME',
 
             'HOME',
             'A_SAFE',
