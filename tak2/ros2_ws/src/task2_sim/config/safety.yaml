@@ -23,6 +23,9 @@ cartesian:
   ik_position_tolerance_m: 0.005
   ik_orientation_tolerance_deg: 3.0
 motion:
+  # Debug / commissioning switch.
+  # false = bypass ROS automatic SAFE_STOP checks.
+  software_safety_enabled: false
   real_low_speed_required: true
   maximum_joint_step_deg_simulation: 6.5
   maximum_joint_step_deg_real: 3.0

@@ -57,6 +57,24 @@ class SafetyMonitor(Node):
             self.config.safety
         )
 
+
+        self.software_safety_enabled = bool(
+            safety.get(
+                'motion',
+                {},
+            ).get(
+                'software_safety_enabled',
+                True,
+            )
+        )
+
+        if not self.software_safety_enabled:
+
+            self.get_logger().warn(
+                'SOFTWARE SAFETY BYPASS ENABLED: '
+                'automatic ROS SAFE_STOP checks are disabled.'
+            )
+
         # -----------------------------------------------------
         # Joint limits
         # -----------------------------------------------------
@@ -270,6 +288,23 @@ class SafetyMonitor(Node):
         self,
         reason,
     ):
+
+        if not self.software_safety_enabled:
+
+            self.get_logger().warn(
+                'SOFTWARE_SAFE_STOP_IGNORED: '
+                +
+                str(reason)
+            )
+
+            self.stop_latched = False
+            self.stop_reason = ''
+
+            self.publish_state(
+                'OK'
+            )
+
+            return
 
         self.stop_latched = True
 
