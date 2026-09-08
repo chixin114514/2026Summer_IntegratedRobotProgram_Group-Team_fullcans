@@ -22,7 +22,7 @@ real:
   driver_type: pymycobot_socket
   robot_ip: 192.168.50.2
   robot_port: 9000
-  arm_speed_percent: 20
+  arm_speed_percent: 10
   gripper_speed_percent: 20
   feedback_period_s: 0.25
 
@@ -31,5 +31,5 @@ real:
   # Only ONE complete action is sent at a time.
   # No trajectory-point backlog is allowed.
   queued_execution: true
-  motion_settle_s: 0.80
-  gripper_settle_s: 0.70
+  motion_settle_s: 0.50
+  gripper_settle_s: 0.50
