@@ -20,7 +20,7 @@ real:
   timeout_s: 1.0
   low_speed_mode: true
   driver_type: pymycobot_socket
-  robot_ip: 192.168.50.2
+  robot_ip: 192.168.31.247
   robot_port: 9000
   arm_speed_percent: 10
   gripper_speed_percent: 20
