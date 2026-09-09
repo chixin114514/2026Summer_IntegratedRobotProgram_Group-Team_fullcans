@@ -190,310 +190,27 @@ class RealRobotDriver(Node):
 
         return method(*args)
 
-    def prepare_hardware_for_motion(self):
-        """Bring MechArm into a commandable position-control state."""
-
-        # If we previously completed full preparation, perform
-        # one cheap servo check before every new target. This
-        # catches a joint (especially J3) dropping out between
-        # motion states.
-        if self.hardware_ready:
-
-            try:
-                all_servos = (
-                    self.optional_robot_call(
-                        'is_all_servo_enable'
-                    )
-                )
-
-                if all_servos in (
-                    None,
-                    1,
-                    True,
-                ):
-                    return True
-
-                self.get_logger().warn(
-                    'REAL_HW_RECHECK: servo enable state '
-                    f'changed to {all_servos!r}; '
-                    'running full preparation.'
-                )
-
-                self.hardware_ready = False
-
-            except Exception as error:
-                self.get_logger().warn(
-                    'REAL_HW_RECHECK_EXCEPTION: '
-                    + str(error)
-                )
-
-                self.hardware_ready = False
-
-        self.get_logger().warn(
-            'REAL_HW_PREPARE: validating physical '
-            'MechArm controller before motion.'
-        )
-
-        # -----------------------------------------------------
-        # Controller / Atom connection
-        # -----------------------------------------------------
-
-        connected = self.optional_robot_call(
-            'is_controller_connected'
-        )
-
-        if connected not in (
-            None,
-            1,
-            True,
-        ):
-            raise RuntimeError(
-                'controller_not_connected '
-                f'status={connected!r}'
-            )
-
-        # -----------------------------------------------------
-        # Power
-        # -----------------------------------------------------
-
-        power = self.optional_robot_call(
-            'is_power_on'
-        )
-
-        if power == 0:
-
-            self.get_logger().warn(
-                'REAL_HW_PREPARE: power is OFF; '
-                'calling power_on().'
-            )
-
-            result = self.optional_robot_call(
-                'power_on'
-            )
-
-            self.get_logger().warn(
-                'REAL_HW_POWER_ON '
-                f'result={result!r}'
-            )
-
-            time.sleep(0.30)
-
-            power = self.optional_robot_call(
-                'is_power_on'
-            )
-
-        if power not in (
-            None,
-            1,
-            True,
-        ):
-            raise RuntimeError(
-                'robot_power_not_ready '
-                f'status={power!r}'
-            )
-
-        # -----------------------------------------------------
-        # Free / drag mode must be OFF for position commands.
-        # -----------------------------------------------------
-
-        free_mode = self.optional_robot_call(
-            'is_free_mode'
-        )
-
-        if free_mode == 1:
-
-            self.get_logger().warn(
-                'REAL_HW_PREPARE: free mode is ON; '
-                'disabling free mode.'
-            )
-
-            self.optional_robot_call(
-                'set_free_mode',
-                0,
-            )
-
-            time.sleep(0.15)
-
-        # -----------------------------------------------------
-        # If a previous run left the controller paused,
-        # release that state before the new command.
-        # -----------------------------------------------------
-
-        paused = self.optional_robot_call(
-            'is_paused'
-        )
-
-        if paused == 1:
-
-            self.get_logger().warn(
-                'REAL_HW_PREPARE: controller is PAUSED; '
-                'calling resume().'
-            )
-
-            result = self.optional_robot_call(
-                'resume'
-            )
-
-            self.get_logger().warn(
-                'REAL_HW_RESUME '
-                f'result={result!r}'
-            )
-
-            time.sleep(0.20)
-
-        # -----------------------------------------------------
-        # Servo enable state.
-        #
-        # This directly addresses the earlier J3 symptom.
-        # A readable angle does NOT prove the servo torque /
-        # actuator is enabled.
-        # -----------------------------------------------------
-
-        servo_method = getattr(
-            self.robot,
-            'is_servo_enable',
-            None,
-        )
-
-        servo_states = []
-
-        if callable(servo_method):
-
-            for servo_id in range(
-                1,
-                7,
-            ):
-
-                status = servo_method(
-                    servo_id
-                )
-
-                if status != 1:
-
-                    self.get_logger().warn(
-                        'REAL_HW_SERVO_ENABLE '
-                        f'joint={servo_id} '
-                        f'before={status!r}'
-                    )
-
-                    focus = getattr(
-                        self.robot,
-                        'focus_servo',
-                        None,
-                    )
-
-                    if callable(focus):
-                        focus(
-                            servo_id
-                        )
-
-                    else:
-                        focus_all = getattr(
-                            self.robot,
-                            'focus_all_servos',
-                            None,
-                        )
-
-                        if callable(focus_all):
-                            focus_all()
-
-                    time.sleep(0.15)
-
-                    status = servo_method(
-                        servo_id
-                    )
-
-                servo_states.append(
-                    status
-                )
-
-                if status != 1:
-                    raise RuntimeError(
-                        'servo_not_enabled '
-                        f'joint={servo_id} '
-                        f'status={status!r}'
-                    )
-
-        else:
-
-            all_servos = (
-                self.optional_robot_call(
-                    'is_all_servo_enable'
-                )
-            )
-
-            if all_servos not in (
-                None,
-                1,
-                True,
-            ):
-
-                self.get_logger().warn(
-                    'REAL_HW_PREPARE: not all servos '
-                    'are enabled; focusing all servos.'
-                )
-
-                self.optional_robot_call(
-                    'focus_all_servos'
-                )
-
-                time.sleep(0.30)
-
-                all_servos = (
-                    self.optional_robot_call(
-                        'is_all_servo_enable'
-                    )
-                )
-
-                if all_servos not in (
-                    None,
-                    1,
-                    True,
-                ):
-                    raise RuntimeError(
-                        'all_servos_not_enabled '
-                        f'status={all_servos!r}'
-                    )
-
-        # -----------------------------------------------------
-        # Do NOT automatically clear genuine robot errors.
-        # A collision / limit error must remain a real fault.
-        # -----------------------------------------------------
-
-        error_info = self.optional_robot_call(
-            'get_error_information'
-        )
-
-        if error_info not in (
-            None,
-            0,
-            [],
-            [0, 0, 0, 0, 0, 0],
-        ):
-            raise RuntimeError(
-                'robot_error_information '
-                f'value={error_info!r}'
-            )
-
-        # Formal one-goal-at-a-time operation.
-        self.optional_robot_call(
-            'set_fresh_mode',
-            0,
-        )
-
-        self.hardware_ready = True
-
-        self.get_logger().warn(
-            'REAL_HW_READY '
-            f'controller={connected!r} '
-            f'power={power!r} '
-            f'free_mode={free_mode!r} '
-            f'paused={paused!r} '
-            f'servos={servo_states!r} '
-            f'error={error_info!r}'
-        )
-
-        return True
+    # ---------------------------------------------------------
+    # IMPORTANT REAL-ROBOT EXECUTION POLICY
+    #
+    # Do not run synchronous hardware diagnostics inside the
+    # arm command callback.
+    #
+    # MechArmSocket calls and feedback polling share this ROS
+    # node. Multiple status queries here previously blocked
+    # get_angles() long enough to create false
+    # REAL_FEEDBACK_STALE faults before send_angles() was even
+    # reached.
+    #
+    # The real motion loop is therefore:
+    #
+    # target -> send_angles immediately
+    #        -> asynchronous get_angles feedback
+    #        -> TaskManager measured convergence
+    #
+    # Genuine send/get communication exceptions still call
+    # communication_fault() and stop the task.
+    # ---------------------------------------------------------
 
     def publish_connection(self, state):
         message = String()
@@ -535,10 +252,10 @@ class RealRobotDriver(Node):
                     'non-finite joint command'
                 )
 
-            # The ROS path being alive is not sufficient.
-            # Prepare the actual actuator state first.
-            self.prepare_hardware_for_motion()
-
+            # Send the complete target immediately.
+            # Do not block this callback with synchronous status
+            # probes; measured JointState provides the motion
+            # verification asynchronously.
             degrees = [
                 math.degrees(value)
                 for value in values

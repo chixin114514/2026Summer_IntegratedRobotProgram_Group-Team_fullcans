@@ -41,7 +41,7 @@ real:
   real_home_tolerance_deg: 1.5
   real_goal_stable_s: 0.50
   real_motion_timeout_s: 20.0
-  real_feedback_max_age_s: 2.0
+  real_feedback_max_age_s: 3.0
   real_goal_log_period_s: 1.0
 
   # RESET_HOME recovery.

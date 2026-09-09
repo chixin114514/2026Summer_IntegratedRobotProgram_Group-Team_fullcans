@@ -45,17 +45,17 @@ def test_real_reset_does_not_own_arm_home_motion():
     )
 
 
-def test_real_driver_prepares_hardware_before_send_angles():
+def test_real_driver_sends_without_blocking_preflight():
     source = text('real_robot_driver.py')
 
-    assert 'def prepare_hardware_for_motion' in source
-    assert "'is_power_on'" in source
-    assert "'is_servo_enable'" in source
-    assert "'focus_servo'" in source
-    assert "'is_paused'" in source
-    assert "'is_free_mode'" in source
-    assert 'REAL_HW_READY' in source
+    assert 'def prepare_hardware_for_motion' not in source
+
+    # The old synchronous diagnostic that returned -1 must not
+    # run in the arm command path.
+    assert "'get_error_information'" not in source
+
     assert 'REAL_ARM_TX ' in source
+    assert 'self.robot.send_angles' in source
 
     block = (
         source
@@ -70,11 +70,11 @@ def test_real_driver_prepares_hardware_before_send_angles():
     )
 
     assert (
-        block.index(
-            'self.prepare_hardware_for_motion()'
-        )
-        <
-        block.index(
-            'self.robot.send_angles'
-        )
+        'prepare_hardware_for_motion'
+        not in block
+    )
+
+    assert (
+        'self.robot.send_angles'
+        in block
     )
