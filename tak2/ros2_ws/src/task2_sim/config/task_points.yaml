@@ -30,6 +30,15 @@ safe_height:
   z: 0.100
 motion:
   simulation_speed_scale: 0.4
+
+  # Gazebo motion completion is verified from measured
+  # joint feedback instead of interpolation time alone.
+  simulation_joint_goal_tolerance_deg: 1.0
+  simulation_goal_stable_s: 0.20
+  simulation_motion_timeout_s: 4.0
+  simulation_feedback_max_age_s: 0.50
+  simulation_goal_log_period_s: 0.50
+
   real_speed_scale: 0.2
   # Real hardware motions are deliberately slower.
   # Keeps consecutive commands below the 3 deg

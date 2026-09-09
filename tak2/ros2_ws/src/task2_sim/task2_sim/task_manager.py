@@ -116,6 +116,64 @@ class TaskManager(Node):
         self.lift_duration = float(motion['lift_duration_s'])
         self.transfer_duration = float(motion['transfer_duration_s'])
 
+        # -----------------------------------------------------
+        # Gazebo measured-state convergence.
+        #
+        # Interpolation time only determines the reference
+        # trajectory. A simulation motion state is complete
+        # only when Gazebo's MEASURED joints physically reach
+        # the target and remain there for a short stable time.
+        # -----------------------------------------------------
+
+        self.sim_joint_goal_tolerance = math.radians(
+            float(
+                motion.get(
+                    'simulation_joint_goal_tolerance_deg',
+                    1.0,
+                )
+            )
+        )
+
+        self.sim_goal_stable_s = max(
+            0.0,
+            float(
+                motion.get(
+                    'simulation_goal_stable_s',
+                    0.20,
+                )
+            ),
+        )
+
+        self.sim_motion_timeout_s = max(
+            0.5,
+            float(
+                motion.get(
+                    'simulation_motion_timeout_s',
+                    4.0,
+                )
+            ),
+        )
+
+        self.sim_feedback_max_age_s = max(
+            0.05,
+            float(
+                motion.get(
+                    'simulation_feedback_max_age_s',
+                    0.50,
+                )
+            ),
+        )
+
+        self.sim_goal_log_period_s = max(
+            0.1,
+            float(
+                motion.get(
+                    'simulation_goal_log_period_s',
+                    0.50,
+                )
+            ),
+        )
+
         gripper = task['gripper']
         self.gripper_open = float(gripper['open_position'])
         self.gripper_closed = float(gripper['closed_position'])
@@ -186,6 +244,10 @@ class TaskManager(Node):
         self.motion_target_pose = list(self.commanded_pose)
         self.motion_start_time = 0.0
         self.motion_duration = 1.0
+
+        self.sim_goal_stable_since = None
+        self.sim_motion_deadline = 0.0
+        self.sim_goal_last_log_time = 0.0
 
         # Real feedback-closed motion state.
         self.real_goal_monitor = None
@@ -271,6 +333,27 @@ class TaskManager(Node):
             <= self.real_feedback_max_age_s
         )
 
+    def simulation_feedback_fresh(
+        self,
+        now=None,
+    ):
+        if self.current_joint_state is None:
+            return False
+
+        if self.last_measured_state_time is None:
+            return False
+
+        if now is None:
+            now = self.now_seconds()
+
+        return (
+            now
+            -
+            self.last_measured_state_time
+            <=
+            self.sim_feedback_max_age_s
+        )
+
     def announce_ready(self):
         if not self.initialisation_ok:
             return
@@ -349,7 +432,26 @@ class TaskManager(Node):
         self.real_goal_command_sent = False
 
         if self.config.is_real_robot:
-            self.commanded_pose = list(self.current_joint_state)
+            self.commanded_pose = list(
+                self.current_joint_state
+            )
+
+        elif (
+            self.config.is_simulation
+            and
+            self.current_joint_state is not None
+        ):
+            self.commanded_pose = list(
+                self.current_joint_state
+            )
+
+            self.get_logger().info(
+                'SIM_TRIAL_RESYNC measured_deg='
+                +
+                self.format_degrees(
+                    self.current_joint_state
+                )
+            )
 
         self.publish_task_state('STARTED')
 
@@ -359,17 +461,45 @@ class TaskManager(Node):
     def robot_state_callback(self, message):
         if len(message.position) < 6:
             return
-        if self.config.is_real_robot:
-            source = message.header.frame_id.strip() or self.robot_state_source
-            if source != 'MEASURED':
-                return
 
-        self.current_joint_state = [float(value) for value in message.position[:6]]
+        source = (
+            message.header.frame_id.strip()
+            or
+            self.robot_state_source
+        )
+
+        # COMMAND_FALLBACK is useful for display, but must not
+        # be treated as physical Gazebo/MechArm convergence.
+        if source != 'MEASURED':
+            return
+
+        self.current_joint_state = [
+            float(value)
+            for value in message.position[:6]
+        ]
+
         if self.config.is_real_robot:
             stamp = message.header.stamp
-            measured_time = float(stamp.sec) + float(stamp.nanosec) / 1e9
+
+            measured_time = (
+                float(stamp.sec)
+                +
+                float(stamp.nanosec)
+                /
+                1e9
+            )
+
             self.last_measured_state_time = (
-                measured_time if measured_time > 0.0 else self.now_seconds()
+                measured_time
+                if measured_time > 0.0
+                else self.now_seconds()
+            )
+
+        else:
+            # For Gazebo, receipt time is sufficient and avoids
+            # mixing simulation-clock stamps with wall time.
+            self.last_measured_state_time = (
+                self.now_seconds()
             )
 
     def safety_stop_callback(self, message):
@@ -463,36 +593,276 @@ class TaskManager(Node):
     # smoothstep interpolation path and 20 Hz publication behaviour.
     # ------------------------------------------------------------------
     def start_motion(self, target, duration):
-        start_pose = list(self.commanded_pose)
-        self.validate_pose_if_enabled(start_pose)
-        self.validate_pose_if_enabled(target)
+
+        # -----------------------------------------------------
+        # SIMULATION PHYSICAL RESYNC
+        #
+        # Never inherit the previous ideal command as the
+        # physical starting pose. Use Gazebo's latest measured
+        # joints at every motion-state boundary.
+        #
+        # This prevents residual controller tracking error from
+        # accumulating from state to state and trial to trial.
+        # -----------------------------------------------------
+
+        if (
+            self.config.is_simulation
+            and
+            self.current_joint_state is not None
+        ):
+            start_pose = list(
+                self.current_joint_state
+            )
+        else:
+            start_pose = list(
+                self.commanded_pose
+            )
+
+        self.validate_pose_if_enabled(
+            start_pose
+        )
+
+        self.validate_pose_if_enabled(
+            target
+        )
+
         self.motion_start_pose = start_pose
-        self.motion_target_pose = list(target)
-        self.motion_start_time = self.now_seconds()
-        self.motion_duration = max(0.5, float(duration))
+        self.motion_target_pose = list(
+            target
+        )
+
+        self.motion_start_time = (
+            self.now_seconds()
+        )
+
+        self.motion_duration = max(
+            0.5,
+            float(duration),
+        )
+
+        self.sim_goal_stable_since = None
+
+        self.sim_motion_deadline = (
+            self.motion_start_time
+            +
+            self.motion_duration
+            +
+            self.sim_motion_timeout_s
+        )
+
+        self.sim_goal_last_log_time = 0.0
+
         self.motion_active = True
+
 
     @staticmethod
     def smoothstep(progress):
-        return 3.0 * progress * progress - 2.0 * progress * progress * progress
+        return (
+            3.0
+            *
+            progress
+            *
+            progress
+            -
+            2.0
+            *
+            progress
+            *
+            progress
+            *
+            progress
+        )
+
 
     def update_motion(self):
-        elapsed = self.now_seconds() - self.motion_start_time
-        progress = max(0.0, min(1.0, elapsed / self.motion_duration))
-        smooth = self.smoothstep(progress)
+
+        now = self.now_seconds()
+
+        elapsed = (
+            now
+            -
+            self.motion_start_time
+        )
+
+        progress = max(
+            0.0,
+            min(
+                1.0,
+                elapsed
+                /
+                self.motion_duration,
+            ),
+        )
+
+        smooth = self.smoothstep(
+            progress
+        )
+
         pose = [
-            start + (target - start) * smooth
+            start
+            +
+            (
+                target
+                -
+                start
+            )
+            *
+            smooth
+
             for start, target in zip(
                 self.motion_start_pose,
                 self.motion_target_pose,
             )
         ]
-        self.publish_joint_command(pose)
-        self.commanded_pose = list(pose)
 
+        # At the end of interpolation always hold the exact
+        # calibrated target while Gazebo physically converges.
         if progress >= 1.0:
+            pose = list(
+                self.motion_target_pose
+            )
+
+        self.publish_joint_command(
+            pose
+        )
+
+        self.commanded_pose = list(
+            pose
+        )
+
+        if progress < 1.0:
+            return False
+
+        state_name = (
+            self.sequence[
+                self.state_index
+            ][0]
+            if (
+                0
+                <=
+                self.state_index
+                <
+                len(self.sequence)
+            )
+            else
+            'UNKNOWN'
+        )
+
+        # -----------------------------------------------------
+        # Do NOT close the gripper / enter the next state until
+        # Gazebo says the joints physically reached the target.
+        # -----------------------------------------------------
+
+        if not self.simulation_feedback_fresh(
+            now
+        ):
+
+            self.sim_goal_stable_since = None
+
+            if now >= self.sim_motion_deadline:
+
+                self.motion_active = False
+
+                self.fail_task(
+                    'SIM_FEEDBACK_TIMEOUT '
+                    f'state={state_name}'
+                )
+
+            return False
+
+        errors = [
+            abs(
+                current
+                -
+                target
+            )
+
+            for current, target in zip(
+                self.current_joint_state,
+                self.motion_target_pose,
+            )
+        ]
+
+        max_error = max(
+            errors
+        )
+
+        if (
+            max_error
+            <=
+            self.sim_joint_goal_tolerance
+        ):
+
+            if self.sim_goal_stable_since is None:
+                self.sim_goal_stable_since = now
+
+            stable_s = (
+                now
+                -
+                self.sim_goal_stable_since
+            )
+
+            if (
+                stable_s
+                >=
+                self.sim_goal_stable_s
+            ):
+
+                self.motion_active = False
+
+                self.commanded_pose = list(
+                    self.motion_target_pose
+                )
+
+                self.get_logger().info(
+                    'SIM_GOAL_REACHED '
+                    f'state={state_name} '
+                    f'max_error_deg='
+                    f'{math.degrees(max_error):.3f} '
+                    f'stable_s={stable_s:.2f}'
+                )
+
+                return True
+
+        else:
+
+            self.sim_goal_stable_since = None
+            stable_s = 0.0
+
+        if now >= self.sim_motion_deadline:
+
             self.motion_active = False
-            return True
+
+            self.fail_task(
+                'SIM_GOAL_TIMEOUT '
+                f'state={state_name} '
+                f'target_deg='
+                f'{self.format_degrees(self.motion_target_pose)} '
+                f'current_deg='
+                f'{self.format_degrees(self.current_joint_state)} '
+                f'max_error_deg='
+                f'{math.degrees(max_error):.3f}'
+            )
+
+            return False
+
+        if (
+            now
+            -
+            self.sim_goal_last_log_time
+            >=
+            self.sim_goal_log_period_s
+        ):
+
+            self.sim_goal_last_log_time = now
+
+            self.get_logger().info(
+                'SIM_GOAL_WAIT '
+                f'state={state_name} '
+                f'max_error_deg='
+                f'{math.degrees(max_error):.3f}'
+            )
+
         return False
 
     # ------------------------------------------------------------------
