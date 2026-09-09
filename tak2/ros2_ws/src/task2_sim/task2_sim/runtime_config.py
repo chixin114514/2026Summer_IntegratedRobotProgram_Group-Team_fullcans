@@ -77,11 +77,13 @@ class Task2Config:
         if mode not in (
             0,
             1,
+            2,
         ):
 
             raise RuntimeError(
                 'device.yaml mode must be '
-                '0 (simulation) or 1 (real robot).'
+                '0 (simulation), 1 (real robot), '
+                'or 2 (real robot test mode).'
             )
 
     @property
@@ -107,8 +109,20 @@ class Task2Config:
 
         return (
             self.mode
+            in
+            (
+                1,
+                2,
+            )
+        )
+
+    @property
+    def is_test_mode(self):
+
+        return (
+            self.mode
             ==
-            1
+            2
         )
 
     def mode_name(self):
@@ -116,5 +130,9 @@ class Task2Config:
         if self.is_simulation:
 
             return 'SIMULATION'
+
+        if self.is_test_mode:
+
+            return 'TEST_REAL_ROBOT'
 
         return 'REAL_ROBOT'

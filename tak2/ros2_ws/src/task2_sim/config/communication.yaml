@@ -10,6 +10,7 @@ common:
   safety_reset_topic: /task2/safety_reset
   task_fault_topic: /task2/task_fault
   task_start_topic: /task2/task_start
+  debug_state_request_topic: /task2/debug_state_request
   trial_result_topic: /task2/trial_result
   trial_reset_request_topic: /task2/trial_reset_request
   trial_reset_done_topic: /task2/trial_reset_done

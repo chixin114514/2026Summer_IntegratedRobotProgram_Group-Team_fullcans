@@ -172,6 +172,21 @@ class TaskManager(Node):
             )
         )
 
+        self.debug_state_request_sub = None
+
+        if self.config.is_test_mode:
+
+            self.debug_state_request_sub = (
+                self.create_subscription(
+                    String,
+                    common[
+                        'debug_state_request_topic'
+                    ],
+                    self.debug_state_request_callback,
+                    10,
+                )
+            )
+
         # ====================================================
         # Explicit task parameters
         # ====================================================
@@ -574,13 +589,18 @@ class TaskManager(Node):
 
         self.task_finished = False
 
-        # The node remains READY until experiment_manager sends
-        # /task2/task_start = true.
+        # Automatic modes remain READY until experiment_manager
+        # sends /task2/task_start = true. TEST mode waits for a
+        # single-state debug request instead.
         self.task_running = False
 
         self.state_index = -1
 
         self.state_started = False
+
+        self.debug_state_active = False
+
+        self.debug_state_name = None
 
         # Current trajectory
         self.motion_active = False
@@ -770,6 +790,13 @@ class TaskManager(Node):
             ),
 
         ]
+
+        self.sequence_index_by_name = {
+            state[0]: index
+            for index, state in enumerate(
+                self.sequence
+            )
+        }
 
         # 20 Hz:
         #
@@ -1090,6 +1117,15 @@ class TaskManager(Node):
         if not message.data:
             return
 
+        if self.config.is_test_mode:
+
+            self.get_logger().warn(
+                'Task start ignored in TEST_REAL_ROBOT; '
+                'use /task2/debug_state_request.'
+            )
+
+            return
+
         if not self.initialisation_ok:
 
             self.get_logger().error(
@@ -1154,6 +1190,90 @@ class TaskManager(Node):
 
         self.publish_task_state(
             'STARTED'
+        )
+
+    def debug_state_request_callback(
+        self,
+        message,
+    ):
+
+        if not self.config.is_test_mode:
+
+            return
+
+        requested_state = message.data
+
+        if self.safety_stopped:
+
+            self.get_logger().error(
+                'Debug state rejected: SAFE_STOP is active.'
+            )
+
+            return
+
+        if not self.initialisation_ok:
+
+            self.get_logger().error(
+                'Debug state rejected: task initialisation '
+                'is not complete.'
+            )
+
+            return
+
+        if self.task_stopped:
+
+            self.get_logger().error(
+                'Debug state rejected: task is stopped.'
+            )
+
+            return
+
+        if (
+            self.task_running
+            or
+            self.state_started
+            or
+            self.motion_active
+            or
+            self.cartesian_active
+        ):
+
+            self.get_logger().warn(
+                'Debug state rejected: another action is running.'
+            )
+
+            return
+
+        if requested_state not in self.sequence_index_by_name:
+
+            valid_states = ', '.join(
+                self.sequence_index_by_name.keys()
+            )
+
+            self.get_logger().error(
+                'Debug state rejected: unknown state '
+                f'"{requested_state}". Valid states: '
+                f'{valid_states}'
+            )
+
+            return
+
+        self.task_running = True
+        self.task_finished = False
+        self.state_index = (
+            self.sequence_index_by_name[
+                requested_state
+            ]
+        )
+        self.state_started = False
+        self.motion_active = False
+        self.cartesian_active = False
+        self.debug_state_active = True
+        self.debug_state_name = requested_state
+
+        self.get_logger().info(
+            'DEBUG STATE REQUEST: '
+            f'{requested_state}'
         )
 
     # ========================================================
@@ -2107,6 +2227,30 @@ class TaskManager(Node):
         self.state_started = True
 
     def finish_state(self):
+
+        if self.debug_state_active:
+
+            completed_state = self.debug_state_name
+
+            self.debug_state_active = False
+            self.debug_state_name = None
+            self.task_running = False
+            self.state_started = False
+            self.motion_active = False
+            self.cartesian_active = False
+            self.state_index = -1
+
+            self.publish_task_state(
+                'DEBUG_COMPLETED: '
+                f'{completed_state}'
+            )
+
+            self.get_logger().info(
+                'DEBUG STATE COMPLETED: '
+                f'{completed_state}'
+            )
+
+            return
 
         self.state_index += 1
 

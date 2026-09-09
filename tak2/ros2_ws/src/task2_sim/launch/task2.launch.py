@@ -109,11 +109,13 @@ def generate_launch_description():
     if mode not in (
         0,
         1,
+        2,
     ):
 
         raise RuntimeError(
             'device.yaml mode must be '
-            '0 (simulation) or 1 (real robot).'
+            '0 (simulation), 1 (real robot), '
+            'or 2 (real robot test mode).'
         )
 
     simulation_mode = (
@@ -130,6 +132,9 @@ def generate_launch_description():
         (
             'SIMULATION'
             if simulation_mode
+            else
+            'TEST REAL ROBOT'
+            if mode == 2
             else
             'REAL ROBOT'
         )
@@ -404,7 +409,7 @@ def generate_launch_description():
         )
 
     # ========================================================
-    # MODE 1: physical MechArm 270
+    # MODE 1/2: physical MechArm 270
     # ========================================================
 
     else:
@@ -495,35 +500,37 @@ def generate_launch_description():
     )
 
     # ========================================================
-    # Experiment manager starts LAST.
+    # Experiment manager starts LAST in automatic modes only.
     #
     # It automatically runs the five acceptance trials.
     # ========================================================
 
-    experiment_manager = (
-        script_process(
-            task2_share,
-            'experiment_manager.py',
-            simulation_mode,
+    if mode != 2:
+
+        experiment_manager = (
+            script_process(
+                task2_share,
+                'experiment_manager.py',
+                simulation_mode,
+            )
         )
-    )
 
-    experiment_delay = (
-        8.0
-        if simulation_mode
-        else
-        4.0
-    )
-
-    actions.append(
-
-        TimerAction(
-            period=experiment_delay,
-            actions=[
-                experiment_manager
-            ],
+        experiment_delay = (
+            8.0
+            if simulation_mode
+            else
+            4.0
         )
-    )
+
+        actions.append(
+
+            TimerAction(
+                period=experiment_delay,
+                actions=[
+                    experiment_manager
+                ],
+            )
+        )
 
     return LaunchDescription(
         actions
