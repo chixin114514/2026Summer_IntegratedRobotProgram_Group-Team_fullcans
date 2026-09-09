@@ -26,10 +26,20 @@ real:
   gripper_speed_percent: 20
   feedback_period_s: 0.25
 
-  # High-level serial action queue for the physical robot.
-  #
-  # Only ONE complete action is sent at a time.
-  # No trajectory-point backlog is allowed.
+  # Formal real-robot acceptance mode is one complete target at a time.
+  # The next target is not allowed until fresh MEASURED JointState feedback
+  # confirms the previous target has physically arrived.
   queued_execution: true
-  motion_settle_s: 0.50
+
+  # Gripper remains time-based because no physical gripper position feedback
+  # is available in the current hardware chain.
   gripper_settle_s: 0.50
+
+  # Real joint feedback closure. All angles are joint-space tolerances and do
+  # not change the calibrated A/B/HOME waypoint values.
+  real_joint_goal_tolerance_deg: 2.0
+  real_home_tolerance_deg: 1.5
+  real_goal_stable_s: 0.50
+  real_motion_timeout_s: 20.0
+  real_feedback_max_age_s: 0.75
+  real_goal_log_period_s: 1.0
