@@ -117,11 +117,45 @@ kinematics:
   - 74.8277
   - -13.4263
 
+  # Simulation-only A-side calibration.
+  #
+  # These overrides fix the Gazebo grasp alignment without
+  # modifying the already calibrated real-robot waypoints.
+  #
+  # All three poses share X≈0.149 m, Y≈0.079 m and keep the
+  # tool vertically downward.
+  #
+  # A_PICK is deliberately 30 mm lower than the previous
+  # simulation grasp pose.
+  simulation_upright_seed_deg:
+
+    a_safe:
+    - 27.9326
+    - 42.4686
+    - -60.5287
+    - 0.0000
+    - 108.0601
+    - 27.9326
+
+    a_pregrasp:
+    - 27.9326
+    - 37.4347
+    - -30.8569
+    - 0.0000
+    - 83.4222
+    - 27.9326
+
+    a_pick:
+    - 27.9326
+    - 51.8086
+    - -15.5586
+    - 0.0000
+    - 53.7501
+    - 27.9326
+
   # Stable IK branches for the upright gripper.
   #
-  # These do NOT define a new task.
-  # They only keep the numerical IK solver on the same
-  # physically upright solution branch at every waypoint.
+  # These remain the formal / real-robot calibrated poses.
   upright_seed_deg:
 
     a_pick:

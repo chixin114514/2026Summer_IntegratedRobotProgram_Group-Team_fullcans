@@ -377,7 +377,37 @@ class TaskManager(Node):
             self.kinematics.validate_joints(pose)
 
     def build_waypoints(self):
-        upright = self.config.task['kinematics']['upright_seed_deg']
+        kinematics = self.config.task['kinematics']
+
+        upright = dict(
+            kinematics['upright_seed_deg']
+        )
+
+        # Gazebo has a different gripper / contact geometry from
+        # the physical robot. Use simulation-only A-side poses
+        # without touching the calibrated real-robot waypoints.
+        if self.config.is_simulation:
+            simulation_upright = (
+                kinematics.get(
+                    'simulation_upright_seed_deg',
+                    {}
+                )
+            )
+
+            for name in (
+                'a_safe',
+                'a_pregrasp',
+                'a_pick',
+            ):
+                if name in simulation_upright:
+                    upright[name] = (
+                        simulation_upright[name]
+                    )
+
+            self.get_logger().info(
+                'SIMULATION A CALIBRATION ACTIVE: '
+                'X≈0.149 Y≈0.079, lower A_PICK.'
+            )
 
         def get_pose(name):
             pose = self.kinematics.degrees_to_radians(upright[name])
