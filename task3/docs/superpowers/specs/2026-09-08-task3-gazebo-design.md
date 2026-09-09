@@ -23,6 +23,11 @@ No source file matching `mecharm_270*.urdf` will be edited. If Task3 needs
 additional world elements or sensors, they will be defined in Task3-owned
 files.
 
+The immutable simulation URDF contains historical Gazebo transport topic names
+under `/task2/`. Task3 will not import Task2 code or packages. A small launch
+adapter will remap only the ROS-facing side of those immutable Gazebo topics to
+the `/task3/` namespace.
+
 ## 2. Environment
 
 The target environment is Ubuntu 22.04.5 LTS on aarch64, ROS 2 Humble,
@@ -71,6 +76,11 @@ Both target types are placed flat. Pickup height and gripper opening are shared
 between classes. Pickup motion depends only on P1-P4; placement depends only on
 the detected class.
 
+The layout keeps the requested topology but uses reachability-checked metric
+coordinates. The pickup radius is about 0.149 m, the layout is rotated 15
+degrees, and BIN_B is limited to a 155-degree base bearing so all fixed poses
+retain joint-limit margin.
+
 ## 5. Perception
 
 The Gazebo camera publishes an image bridged to `sensor_msgs/Image`.
@@ -87,6 +97,11 @@ the configured image regions.
 A single-object ROS 2 Action accepts the selected pickup grid and destination
 bin. It publishes meaningful stage feedback and returns separate pickup and
 placement results.
+
+The motion backend uses fixed, reachability-checked joint arrays for P1-P4 and
+BIN_A/B. It does not run MoveIt or online grasp planning. It must evaluate a
+measured Gazebo object pose after lift and after release; command completion
+alone is not a successful grasp or placement.
 
 The controller uses a small explicit state machine:
 

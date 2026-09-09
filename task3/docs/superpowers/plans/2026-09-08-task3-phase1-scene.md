@@ -288,7 +288,7 @@ Stage 1.
 Use checksum-preserving `rsync` to:
 
 ```text
-nvidia@192.168.55.1:/home/nvidia/Desktop/2026Summer_IntegratedRobotProgram_Group-Team_fullcans/task3/
+nvidia@192.168.31.146:/home/nvidia/Desktop/2026Summer_IntegratedRobotProgram_Group-Team_fullcans/task3/
 ```
 
 Exclude local/remote `build/`, `install/`, `log/`, `__pycache__/`, and `.DS_Store` from transfer. Do not modify `tak2`.
@@ -300,7 +300,7 @@ On Jetson:
 ```bash
 cd /home/nvidia/Desktop/2026Summer_IntegratedRobotProgram_Group-Team_fullcans/task3/ros2_ws
 source /opt/ros/humble/setup.bash
-colcon build --symlink-install --packages-select mycobot_description task3_sim
+colcon build --symlink-install --merge-install --packages-select mycobot_description task3_sim
 ```
 
 Expected: both packages finish successfully. A successful build is not Gazebo acceptance.

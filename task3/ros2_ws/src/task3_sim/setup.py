@@ -17,6 +17,11 @@ setup(
         ("share/" + package_name + "/urdf", glob("urdf/*.urdf")),
     ],
     install_requires=["setuptools"],
+    entry_points={
+        "console_scripts": [
+            "pick_sort_server = task3_sim.pick_sort_server:main",
+        ],
+    },
     zip_safe=True,
     maintainer="Integrated Robot Program Group Team",
     maintainer_email="team@example.com",

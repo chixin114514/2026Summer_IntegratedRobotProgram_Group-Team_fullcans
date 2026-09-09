@@ -1,0 +1,11 @@
+string grid_id
+string bin_id
+---
+bool success
+bool pick_verified
+bool place_verified
+string object_name
+string message
+---
+string stage
+float32 progress
