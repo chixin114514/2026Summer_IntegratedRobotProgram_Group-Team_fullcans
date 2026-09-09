@@ -1,0 +1,27 @@
+table:
+  size: [0.80, 0.70, 0.40]
+  top_z: 0.4
+arm: [0.0, 0.0]
+grids:
+  P1: [0.16, 0.14]
+  P2: [0.16, -0.14]
+  P3: [-0.16, 0.14]
+  P4: [-0.16, -0.14]
+bins:
+  BIN_A: [0.16, 0.0]
+  BIN_B: [-0.16, 0.0]
+objects:
+  orange_battery:
+    model: orange_battery_1
+    grid: P1
+    bin: BIN_A
+  green_can:
+    model: green_can_1
+    grid: P4
+    bin: BIN_B
+camera:
+  topic: /task3/camera/image_raw
+  pose: [0.0, 0.0, 1.35, 0.0, 1.5708, 0.0]
+  image_size: [640, 480]
+  update_rate: 30
+  horizontal_fov: 1.05
