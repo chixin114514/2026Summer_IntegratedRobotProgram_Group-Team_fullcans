@@ -259,9 +259,14 @@
 
       <initial_position>0.003759439</initial_position>
       <topic>/task2/joint2/cmd_pos</topic>
-      <p_gain>8.0</p_gain>
-      <i_gain>0.1</i_gain>
-      <d_gain>0.4</d_gain>
+
+      <!-- Shoulder joint carries most of the arm gravity load.
+           Stronger PID removes the previous ~5 deg static sag. -->
+      <p_gain>40.0</p_gain>
+      <i_gain>2.0</i_gain>
+      <d_gain>2.0</d_gain>
+      <i_max>5.0</i_max>
+      <i_min>-5.0</i_min>
     </plugin>
 
     <plugin filename="ignition-gazebo-joint-position-controller-system"
@@ -270,9 +275,14 @@
 
       <initial_position>-0.356478264</initial_position>
       <topic>/task2/joint3/cmd_pos</topic>
-      <p_gain>8.0</p_gain>
-      <i_gain>0.1</i_gain>
-      <d_gain>0.4</d_gain>
+
+      <!-- Elbow joint also carries gravity load.
+           Match J2 stiffness to preserve upright tool pose. -->
+      <p_gain>40.0</p_gain>
+      <i_gain>2.0</i_gain>
+      <d_gain>2.0</d_gain>
+      <i_max>5.0</i_max>
+      <i_min>-5.0</i_min>
     </plugin>
 
     <plugin filename="ignition-gazebo-joint-position-controller-system"

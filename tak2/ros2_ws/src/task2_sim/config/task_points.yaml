@@ -35,7 +35,7 @@ motion:
   # joint feedback instead of interpolation time alone.
   simulation_joint_goal_tolerance_deg: 1.0
   simulation_goal_stable_s: 0.20
-  simulation_motion_timeout_s: 4.0
+  simulation_motion_timeout_s: 8.0
   simulation_feedback_max_age_s: 0.50
   simulation_goal_log_period_s: 0.50
 
