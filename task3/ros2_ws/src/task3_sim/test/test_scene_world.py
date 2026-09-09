@@ -163,10 +163,12 @@ class SceneWorldTests(unittest.TestCase):
             self.assertIsNotNone(model.find(".//link/collision/surface/friction"))
 
         orange_size = _floats(orange.find(".//collision/geometry/box/size").text)
-        self.assertEqual(orange_size, [0.070, 0.035, 0.035])
+        self.assertEqual(orange_size, [0.070, 0.025, 0.025])
         green_cylinder = green.find(".//collision/geometry/cylinder")
-        self.assertEqual(float(green_cylinder.findtext("radius")), 0.0175)
+        self.assertEqual(float(green_cylinder.findtext("radius")), 0.0125)
         self.assertEqual(float(green_cylinder.findtext("length")), 0.070)
+        self.assertTrue(_near(_floats(orange.findtext("pose"))[2], 0.4130))
+        self.assertTrue(_near(_floats(green.findtext("pose"))[2], 0.4130))
         green_pose = _floats(green.findtext("pose"))
         self.assertTrue(_near(green_pose[3], 0.0) and _near(green_pose[4], 1.5708), green_pose)
 
@@ -195,6 +197,8 @@ class SceneWorldTests(unittest.TestCase):
         # Grid markers have no collision, so the physical support is the table.
         # Keep a 0.5 mm clearance to avoid initial object/table penetration.
         support_clearance = 0.0005
+        self.assertTrue(_near(orange_lowest, 0.4005))
+        self.assertTrue(_near(green_lowest, 0.4005))
         self.assertGreaterEqual(orange_lowest, table_top + support_clearance - 1e-6)
         self.assertGreaterEqual(green_lowest, table_top + support_clearance - 1e-6)
 
