@@ -272,25 +272,49 @@ class RealRobotDriver(Node):
                 + f'speed={self.arm_speed}%'
             )
 
-            result = self.robot.send_angles(
-                degrees,
-                self.arm_speed,
-            )
+            # MechArmSocket SEND_ANGLES is a command, not
+            # an acknowledgement-based motion result.
+            #
+            # In synchronous socket mode pymycobot may retry
+            # waiting for a reply and finally return -1 even
+            # though Server_270 has already forwarded the
+            # motion command to the robot.
+            #
+            # Task2 already verifies physical arrival through
+            # asynchronous MEASURED get_angles() feedback, so
+            # the formal socket path must be fire-and-verify.
+            if self.driver_type == 'pymycobot_socket':
 
-            self.get_logger().info(
-                'REAL_ARM_TX_RETURN '
-                f'value={result!r}'
-            )
-
-            if result in (
-                0,
-                -1,
-                False,
-            ):
-                raise RuntimeError(
-                    'send_angles rejected '
-                    f'result={result!r}'
+                result = self.robot.send_angles(
+                    degrees,
+                    self.arm_speed,
+                    _async=True,
                 )
+
+                self.get_logger().info(
+                    'REAL_ARM_TX_DISPATCHED '
+                    'mode=socket_async '
+                    f'return={result!r}'
+                )
+
+            else:
+
+                result = self.robot.send_angles(
+                    degrees,
+                    self.arm_speed,
+                )
+
+                self.get_logger().info(
+                    'REAL_ARM_TX_DISPATCHED '
+                    'mode=serial '
+                    f'return={result!r}'
+                )
+
+            # IMPORTANT:
+            # Do NOT interpret None / -1 / 0 as motion failure.
+            #
+            # Physical success is determined exclusively by
+            # fresh measured joint feedback in TaskManager.
 
         except Exception as error:
             self.hardware_ready = False
