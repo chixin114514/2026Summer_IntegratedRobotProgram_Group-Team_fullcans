@@ -10,7 +10,6 @@ from sensor_msgs.msg import JointState
 from std_msgs.msg import Bool, Float64MultiArray, String
 
 from task2_sim.real_goal_monitor import (
-    JointGoalMonitor,
     radians_to_degrees,
     reset_ready,
     within_tolerance,
@@ -66,7 +65,12 @@ class TrialResetInterface(Node):
         self.operator_ready = False
         self.robot_home_confirmed = False
         self.real_home_command_sent = False
-        self.real_home_monitor = None
+
+        # RESET_HOME is self-verifying.
+        # There is deliberately no fixed motion timeout here.
+        # The next trial cannot start until fresh measured
+        # feedback actually confirms HOME.
+        self.real_home_stable_since = None
         self.real_home_last_log_time = 0.0
 
         self.current_joint_state = None
@@ -172,7 +176,7 @@ class TrialResetInterface(Node):
         self.waiting_for_operator = False
         self.operator_ready = False
         self.robot_home_confirmed = False
-        self.real_home_monitor = None
+        self.real_home_stable_since = None
         self.real_home_command_sent = False
 
         message = String()
@@ -197,16 +201,8 @@ class TrialResetInterface(Node):
         self.operator_ready = False
         self.robot_home_confirmed = False
         self.real_home_command_sent = False
+        self.real_home_stable_since = None
         self.real_home_last_log_time = 0.0
-        self.real_home_monitor = JointGoalMonitor(
-            state_name='RESET_HOME',
-            target=self.real_home,
-            tolerance_rad=self.real_home_tolerance,
-            stable_required_s=self.real_goal_stable_s,
-            timeout_s=self.real_motion_timeout_s,
-            feedback_max_age_s=self.real_feedback_max_age_s,
-            started_at=now,
-        )
 
         state = String()
         state.data = 'RESET_HOME'
@@ -215,13 +211,20 @@ class TrialResetInterface(Node):
         self.get_logger().warn('========================================')
         self.get_logger().warn('REAL ROBOT RESET STARTED')
         self.get_logger().warn(
-            'HOME will be verified from fresh MEASURED JointState. '
-            'An extra HOME command is sent only when the robot is not '
-            'already within HOME tolerance.'
+            'HOME confirmation is AUTOMATIC from fresh MEASURED '
+            'JointState. No operator HOME confirmation is required.'
         )
-        self.get_logger().warn('Place the physical object back at point A.')
         self.get_logger().warn(
-            'Then run: ros2 topic pub --once /task2/operator_reset_done '
+            'If the robot is not at HOME, exactly one HOME command '
+            'will be sent and measured feedback will be checked '
+            'continuously until HOME is physically confirmed.'
+        )
+        self.get_logger().warn(
+            'Place the physical object back at point A.'
+        )
+        self.get_logger().warn(
+            'operator_reset_done confirms OBJECT AT A ONLY: '
+            'ros2 topic pub --once /task2/operator_reset_done '
             'std_msgs/msg/Bool "{data: true}"'
         )
         self.get_logger().warn('========================================')
@@ -313,7 +316,8 @@ class TrialResetInterface(Node):
 
         self.operator_ready = True
         self.get_logger().info(
-            'REAL ROBOT RESET: operator confirmed object at point A.'
+            'REAL ROBOT RESET: operator confirmed OBJECT at point A. '
+            'HOME is checked automatically.'
         )
         self.try_finish_real_reset()
 
@@ -325,7 +329,7 @@ class TrialResetInterface(Node):
 
         self.waiting_for_operator = False
         self.operator_ready = False
-        self.real_home_monitor = None
+        self.real_home_stable_since = None
         self.get_logger().info(
             'REAL ROBOT RESET COMPLETE: measured HOME confirmed and object '
             'confirmed at A.'
@@ -333,74 +337,123 @@ class TrialResetInterface(Node):
         self.publish_reset_done()
 
     def update_real_reset(self, now):
-        if not self.waiting_for_operator or self.real_home_monitor is None:
+
+        if not self.waiting_for_operator:
             return
 
-        evaluation = self.real_home_monitor.evaluate(
-            now,
-            self.current_joint_state,
-            self.last_measured_state_time,
-        )
-
-        if evaluation.status == JointGoalMonitor.FEEDBACK_STALE:
-            age = (
-                'N/A'
-                if evaluation.feedback_age_s is None
-                else f'{evaluation.feedback_age_s:.3f}'
-            )
-            self.publish_fault(
-                'RESET_HOME_FEEDBACK_STALE '
-                f'current_deg={self.format_degrees(self.current_joint_state)} '
-                f'feedback_age_s={age}'
-            )
-            return
-
-        if evaluation.status == JointGoalMonitor.TIMEOUT:
-            max_error = (
-                'N/A'
-                if evaluation.max_error_rad is None
-                else f'{math.degrees(evaluation.max_error_rad):.2f}'
-            )
-            self.publish_fault(
-                'RESET_HOME_TIMEOUT '
-                f'target_deg={self.format_degrees(self.real_home)} '
-                f'current_deg={self.format_degrees(self.current_joint_state)} '
-                f'max_error_deg={max_error}'
-            )
-            return
-
-        if (
-            not self.real_home_command_sent
-            and evaluation.max_error_rad is not None
-            and evaluation.max_error_rad > self.real_home_tolerance
-        ):
-            self.send_home_once()
-
-        if evaluation.status == JointGoalMonitor.REACHED:
-            self.robot_home_confirmed = True
-            max_error_deg = math.degrees(evaluation.max_error_rad or 0.0)
-            self.get_logger().info(
-                'RESET_HOME_CONFIRMED '
-                f'measured_deg={self.format_degrees(self.current_joint_state)} '
-                f'max_error_deg={max_error_deg:.2f} '
-                f'stable_s={evaluation.stable_s:.2f}'
-            )
-            self.real_home_monitor = None
+        # HOME has already been physically verified.
+        # We may still be waiting for the operator to put
+        # the object back at A.
+        if self.robot_home_confirmed:
             self.try_finish_real_reset()
             return
 
-        if now - self.real_home_last_log_time >= self.real_goal_log_period_s:
-            self.real_home_last_log_time = now
-            max_error = (
-                'N/A'
-                if evaluation.max_error_rad is None
-                else f'{math.degrees(evaluation.max_error_rad):.2f}'
+        # -----------------------------------------------------
+        # Never convert a temporary feedback delay into a fake
+        # HOME failure.
+        #
+        # Driver communication faults still propagate through
+        # /task2/task_fault independently.
+        # -----------------------------------------------------
+
+        if not self.measured_feedback_fresh(now):
+
+            self.real_home_stable_since = None
+
+            if (
+                now
+                -
+                self.real_home_last_log_time
+                >=
+                self.real_goal_log_period_s
+            ):
+                self.real_home_last_log_time = now
+
+                self.get_logger().warn(
+                    'RESET_HOME_AUTO_CHECK '
+                    'waiting_for=fresh_MEASURED_feedback'
+                )
+
+            return
+
+        errors = [
+            abs(current - target)
+
+            for current, target in zip(
+                self.current_joint_state,
+                self.real_home,
             )
+        ]
+
+        max_error = max(errors)
+
+        # -----------------------------------------------------
+        # Already physically HOME:
+        # do NOT enqueue another HOME command.
+        # -----------------------------------------------------
+
+        if (
+            max_error
+            <=
+            self.real_home_tolerance
+        ):
+
+            if self.real_home_stable_since is None:
+                self.real_home_stable_since = now
+
+            stable_s = (
+                now
+                -
+                self.real_home_stable_since
+            )
+
+            if (
+                stable_s
+                >=
+                self.real_goal_stable_s
+            ):
+
+                self.robot_home_confirmed = True
+
+                self.get_logger().info(
+                    'RESET_HOME_CONFIRMED_AUTO '
+                    f'measured_deg='
+                    f'{self.format_degrees(self.current_joint_state)} '
+                    f'max_error_deg='
+                    f'{math.degrees(max_error):.2f} '
+                    f'stable_s={stable_s:.2f}'
+                )
+
+                self.try_finish_real_reset()
+                return
+
+        else:
+
+            self.real_home_stable_since = None
+            stable_s = 0.0
+
+            # Only one HOME target is sent.
+            # We then wait for actual measured convergence.
+            if not self.real_home_command_sent:
+                self.send_home_once()
+
+        if (
+            now
+            -
+            self.real_home_last_log_time
+            >=
+            self.real_goal_log_period_s
+        ):
+
+            self.real_home_last_log_time = now
+
             self.get_logger().info(
-                'REAL_GOAL_WAIT state=RESET_HOME '
-                f'current_deg={self.format_degrees(self.current_joint_state)} '
-                f'max_error_deg={max_error} '
-                f'stable_s={evaluation.stable_s:.2f}'
+                'RESET_HOME_AUTO_CHECK '
+                f'current_deg='
+                f'{self.format_degrees(self.current_joint_state)} '
+                f'max_error_deg='
+                f'{math.degrees(max_error):.2f} '
+                f'stable_s={stable_s:.2f}'
             )
 
     def update(self):
