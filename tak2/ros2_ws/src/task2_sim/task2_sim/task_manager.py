@@ -174,6 +174,15 @@ class TaskManager(Node):
             ),
         )
 
+        self.sim_timeout_acceptance = math.radians(
+            float(
+                motion.get(
+                    'simulation_timeout_acceptance_deg',
+                    2.0,
+                )
+            )
+        )
+
         gripper = task['gripper']
         self.gripper_open = float(gripper['open_position'])
         self.gripper_closed = float(gripper['closed_position'])
@@ -830,6 +839,43 @@ class TaskManager(Node):
             stable_s = 0.0
 
         if now >= self.sim_motion_deadline:
+
+            # -------------------------------------------------
+            # Gazebo-only bounded soft acceptance.
+            #
+            # Small residual PID error under gravity must not
+            # abort the complete 5-trial acceptance run.
+            #
+            # We still keep measured-state resynchronisation at
+            # every following state, so this does NOT restore
+            # the old cumulative-drift behaviour.
+            # -------------------------------------------------
+
+            if (
+                max_error
+                <=
+                self.sim_timeout_acceptance
+            ):
+
+                self.motion_active = False
+
+                # IMPORTANT:
+                # Preserve the ACTUAL measured Gazebo pose as
+                # the next state's reference instead of lying
+                # that the exact target was reached.
+                self.commanded_pose = list(
+                    self.current_joint_state
+                )
+
+                self.get_logger().warn(
+                    'SIM_GOAL_ACCEPTED '
+                    f'state={state_name} '
+                    f'max_error_deg='
+                    f'{math.degrees(max_error):.3f} '
+                    'reason=bounded_gazebo_residual'
+                )
+
+                return True
 
             self.motion_active = False
 

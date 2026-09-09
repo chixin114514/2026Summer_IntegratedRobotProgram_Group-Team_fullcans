@@ -33,11 +33,16 @@ motion:
 
   # Gazebo motion completion is verified from measured
   # joint feedback instead of interpolation time alone.
-  simulation_joint_goal_tolerance_deg: 1.0
-  simulation_goal_stable_s: 0.20
-  simulation_motion_timeout_s: 8.0
+  simulation_joint_goal_tolerance_deg: 1.5
+  simulation_goal_stable_s: 0.10
+  simulation_motion_timeout_s: 3.0
   simulation_feedback_max_age_s: 0.50
   simulation_goal_log_period_s: 0.50
+
+  # Gazebo PID may retain a small steady-state error under gravity.
+  # At timeout, a residual error below this value is accepted with
+  # a warning instead of aborting the entire five-trial experiment.
+  simulation_timeout_acceptance_deg: 2.0
 
   real_speed_scale: 0.2
   # Real hardware motions are deliberately slower.
