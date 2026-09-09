@@ -31,3 +31,50 @@ def test_safety_reset_is_subscribed_by_all_latched_motion_nodes():
     assert 'def safety_reset_callback' in task_manager
     assert 'def safety_reset_callback' in driver
     assert 'def reset_callback' in safety
+
+
+def test_real_reset_does_not_own_arm_home_motion():
+    source = text('trial_reset_interface.py')
+
+    assert 'requested_arm_command_topic' not in source
+    assert 'REAL_GOAL_SENT state=RESET_HOME' not in source
+
+    assert (
+        'HOME motion is owned exclusively'
+        in source
+    )
+
+
+def test_real_driver_prepares_hardware_before_send_angles():
+    source = text('real_robot_driver.py')
+
+    assert 'def prepare_hardware_for_motion' in source
+    assert "'is_power_on'" in source
+    assert "'is_servo_enable'" in source
+    assert "'focus_servo'" in source
+    assert "'is_paused'" in source
+    assert "'is_free_mode'" in source
+    assert 'REAL_HW_READY' in source
+    assert 'REAL_ARM_TX ' in source
+
+    block = (
+        source
+        .split(
+            'def arm_command_callback',
+            1,
+        )[1]
+        .split(
+            'def gripper_command_callback',
+            1,
+        )[0]
+    )
+
+    assert (
+        block.index(
+            'self.prepare_hardware_for_motion()'
+        )
+        <
+        block.index(
+            'self.robot.send_angles'
+        )
+    )
