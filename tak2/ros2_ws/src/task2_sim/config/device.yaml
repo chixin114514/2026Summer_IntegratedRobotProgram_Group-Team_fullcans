@@ -43,3 +43,11 @@ real:
   real_motion_timeout_s: 20.0
   real_feedback_max_age_s: 2.0
   real_goal_log_period_s: 1.0
+
+  # RESET_HOME recovery.
+  # Retry the identical HOME target only when fresh measured
+  # feedback shows that the robot has made no meaningful
+  # progress for several seconds.
+  real_home_retry_interval_s: 3.0
+  real_home_progress_epsilon_deg: 0.30
+  real_home_max_retries: 3
