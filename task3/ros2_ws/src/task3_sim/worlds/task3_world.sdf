@@ -78,7 +78,7 @@
 
     <model name="grid_p1">
       <static>true</static>
-      <pose>0.13213 0.06812 0.402 0 0 0</pose>
+      <pose>0.141018 0.072702 0.402 0 0 0</pose>
       <link name="grid">
         <visual name="visual">
           <geometry><box><size>0.09 0.09 0.002</size></box></geometry>
@@ -119,7 +119,7 @@
 
     <model name="bin_a">
       <static>true</static>
-      <pose>0.12557 -0.03365 0.40 0 0 0</pose>
+      <pose>0.135229 -0.036238 0.40 0 0 0</pose>
       <link name="floor">
         <collision name="collision"><geometry><box><size>0.10 0.10 0.01</size></box></geometry></collision>
         <visual name="visual"><geometry><box><size>0.10 0.10 0.01</size></box></geometry><material><ambient>0.80 0.20 0.02 1</ambient><diffuse>1.0 0.32 0.02 1</diffuse></material></visual>
@@ -145,7 +145,7 @@
 
     <model name="orange_battery_1">
       <static>false</static>
-      <pose>0.13213 0.06812 0.4130 0 0 0</pose>
+      <pose>0.141018 0.072702 0.4130 0 0 0</pose>
       <link name="body">
         <inertial>
           <mass>0.08</mass>

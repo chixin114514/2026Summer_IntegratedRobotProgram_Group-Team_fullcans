@@ -133,7 +133,7 @@ class SceneWorldTests(unittest.TestCase):
         self.assertTrue(_near(table_pose[2], 0.20))
 
         expected = {
-            "grid_p1": (0.13213, 0.06812),
+            "grid_p1": (0.141018, 0.072702),
             "grid_p2": (0.08037, -0.12506),
             "grid_p3": (-0.08037, 0.12506),
             "grid_p4": (-0.13213, -0.06812),
@@ -188,6 +188,8 @@ class SceneWorldTests(unittest.TestCase):
         green = self.world.find("model[@name='green_can_1']")
         orange_pose = _floats(orange.findtext("pose"))
         orange_size = _floats(orange.find(".//collision/geometry/box/size").text)
+        self.assertTrue(_near(orange_pose[0], 0.141018))
+        self.assertTrue(_near(orange_pose[1], 0.072702))
         orange_lowest = orange_pose[2] - orange_size[2] / 2.0
 
         green_pose = _floats(green.findtext("pose"))
@@ -207,13 +209,13 @@ class SceneWorldTests(unittest.TestCase):
         self.assertEqual(self.config["table"]["top_z"], 0.4)
         self.assertEqual(self.config["arm"], [0.0, 0.0])
         self.assertEqual(self.config["grids"], {
-            "P1": [0.13213, 0.06812],
+            "P1": [0.141018, 0.072702],
             "P2": [0.08037, -0.12506],
             "P3": [-0.08037, 0.12506],
             "P4": [-0.13213, -0.06812],
         })
         self.assertEqual(self.config["bins"], {
-            "BIN_A": [0.12557, -0.03365],
+            "BIN_A": [0.135229, -0.036238],
             "BIN_B": [-0.11782, 0.05494],
         })
         self.assertEqual(self.config["camera"]["topic"], "/task3/camera/image_raw")

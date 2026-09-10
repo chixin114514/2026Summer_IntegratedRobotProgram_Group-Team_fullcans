@@ -16,13 +16,13 @@ SCENE_CONFIG_PATH = CONFIG_PATH.parent / "scene.yaml"
 
 
 EXPECTED_GRIDS = {
-    "P1": [0.13213, 0.06812],
+    "P1": [0.141018, 0.072702],
     "P2": [0.08037, -0.12506],
     "P3": [-0.08037, 0.12506],
     "P4": [-0.13213, -0.06812],
 }
 EXPECTED_BINS = {
-    "BIN_A": [0.12557, -0.03365],
+    "BIN_A": [0.135229, -0.036238],
     "BIN_B": [-0.11782, 0.05494],
 }
 EXPECTED_LIMITS = {
@@ -113,18 +113,28 @@ class MotionConfigTests(unittest.TestCase):
     def test_p1_uses_measured_plus_y_gripper_center_correction(self):
         self.assertEqual(
             self.config["picks"]["P1"]["above"],
-            [33.3624, 31.7225, -43.2093, 0.0, 101.4797, 33.3624],
+            [33.0011, 41.3163, -58.4704, 0.0, 107.1505, 33.0011],
         )
         self.assertEqual(
             self.config["picks"]["P1"]["pick"],
-            [33.3541, 48.1151, -5.5796, -0.0058, 47.4603, 33.3584],
+            [33.0011, 53.2161, -15.0315, 0.0, 51.8150, 33.0011],
         )
         self.assertEqual(
             self.config["picks"]["P1"]["descent"],
             [
-                [33.3627, 30.8631, -20.9472, 0.0, 80.0875, 33.3627],
-                [33.3626, 37.6076, -9.1040, 0.0, 61.4978, 33.3627],
+                [33.0012, 37.2339, -30.5891, 0.0, 83.3572, 33.0012],
+                [33.0012, 43.0785, -18.1624, 0.0, 65.0861, 33.0012],
             ],
+        )
+
+    def test_bin_a_uses_radially_outward_configuration(self):
+        self.assertEqual(
+            self.config["bins"]["BIN_A"]["above"],
+            [-15.0016, 19.9197, -29.4546, 0.0, 99.5326, -15.0016],
+        )
+        self.assertEqual(
+            self.config["bins"]["BIN_A"]["place"],
+            [-15.0015, 22.7137, 0.0203, 0.0, 67.2678, -15.0015],
         )
 
     def test_common_heights_gripper_values_and_motion_rate_are_defined(self):
