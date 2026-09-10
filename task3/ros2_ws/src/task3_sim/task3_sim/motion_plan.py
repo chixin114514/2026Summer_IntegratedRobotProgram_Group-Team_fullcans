@@ -25,6 +25,13 @@ def validate_goal(grid_id: str, bin_id: str, config: Mapping) -> None:
     for phase in ("above", "pick"):
         if phase not in picks[grid_id] or len(picks[grid_id][phase]) != 6:
             raise ValueError(f"missing six-joint pose: {grid_id}.{phase}")
+    if "descent" in picks[grid_id]:
+        descent = picks[grid_id]["descent"]
+        if not isinstance(descent, (list, tuple)):
+            raise ValueError(f"descent must be a list: {grid_id}")
+        for index, pose in enumerate(descent, start=1):
+            if not isinstance(pose, (list, tuple)) or len(pose) != 6:
+                raise ValueError(f"missing six-joint pose: {grid_id}.descent_{index}")
     for phase in ("above", "place"):
         if phase not in bins[bin_id] or len(bins[bin_id][phase]) != 6:
             raise ValueError(f"missing six-joint pose: {bin_id}.{phase}")
@@ -40,6 +47,7 @@ def build_sequence(grid_id: str, bin_id: str, config: Mapping) -> list[MotionSte
     home = tuple(float(value) for value in config["home"])
     pick_above = tuple(float(value) for value in pick["above"])
     pick_pose = tuple(float(value) for value in pick["pick"])
+    descent_poses = pick.get("descent", ())
     bin_above = tuple(float(value) for value in target["above"])
     bin_place = tuple(float(value) for value in target["place"])
 
@@ -56,15 +64,46 @@ def build_sequence(grid_id: str, bin_id: str, config: Mapping) -> list[MotionSte
             duration_s=float(durations[duration_key]),
         )
 
-    return [
+    sequence = [
         step("OPEN", home, opened, "gripper"),
         step("PICK_ABOVE", pick_above, opened, "transfer"),
-        step("PICK", pick_pose, opened, "vertical"),
-        step("CLOSE", pick_pose, closed, "gripper"),
-        step("LIFT", pick_above, closed, "vertical"),
-        step("BIN_ABOVE", bin_above, closed, "transfer"),
-        step("BIN_PLACE", bin_place, closed, "vertical"),
-        step("RELEASE", bin_place, opened, "gripper"),
-        step("RETREAT", bin_above, opened, "vertical"),
-        step("HOME", home, opened, "home"),
     ]
+    sequence.extend(
+        step(
+            f"PICK_DESCEND_{index}",
+            pose,
+            opened,
+            "descent_segment",
+        )
+        for index, pose in enumerate(descent_poses, start=1)
+    )
+    sequence.extend(
+        [
+            step("PICK", pick_pose, opened, "vertical"),
+            step("CLOSE", pick_pose, closed, "gripper"),
+        ]
+    )
+    if descent_poses:
+        sequence.extend(
+            step(
+                f"LIFT_ASCEND_{index}",
+                pose,
+                closed,
+                "descent_segment",
+            )
+            for index, pose in enumerate(reversed(descent_poses), start=1)
+        )
+        lift_duration = "descent_segment"
+    else:
+        lift_duration = "vertical"
+    sequence.extend(
+        [
+            step("LIFT", pick_above, closed, lift_duration),
+            step("BIN_ABOVE", bin_above, closed, "transfer"),
+            step("BIN_PLACE", bin_place, closed, "vertical"),
+            step("RELEASE", bin_place, opened, "gripper"),
+            step("RETREAT", bin_above, opened, "vertical"),
+            step("HOME", home, opened, "home"),
+        ]
+    )
+    return sequence

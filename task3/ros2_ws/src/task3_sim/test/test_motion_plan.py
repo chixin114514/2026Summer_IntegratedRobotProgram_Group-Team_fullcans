@@ -66,8 +66,12 @@ class MotionPlanTests(unittest.TestCase):
             [
                 "OPEN",
                 "PICK_ABOVE",
+                "PICK_DESCEND_1",
+                "PICK_DESCEND_2",
                 "PICK",
                 "CLOSE",
+                "LIFT_ASCEND_1",
+                "LIFT_ASCEND_2",
                 "LIFT",
                 "BIN_ABOVE",
                 "BIN_PLACE",
@@ -82,6 +86,7 @@ class MotionPlanTests(unittest.TestCase):
             tuple(self.config["home"]),
             tuple(self.config["picks"]["P1"]["above"]),
             tuple(self.config["picks"]["P1"]["pick"]),
+            *(tuple(pose) for pose in self.config["picks"]["P1"]["descent"]),
             tuple(self.config["bins"]["BIN_A"]["above"]),
             tuple(self.config["bins"]["BIN_A"]["place"]),
         }
@@ -91,9 +96,62 @@ class MotionPlanTests(unittest.TestCase):
             sequence[1].arm_deg,
             tuple(self.config["picks"]["P1"]["above"]),
         )
+        self.assertEqual(
+            sequence[2].arm_deg,
+            tuple(self.config["picks"]["P1"]["descent"][0]),
+        )
+        self.assertEqual(
+            sequence[3].arm_deg,
+            tuple(self.config["picks"]["P1"]["descent"][1]),
+        )
+        self.assertEqual(sequence[2].gripper_rad, self.config["gripper"]["open_rad"])
+        self.assertEqual(sequence[3].gripper_rad, self.config["gripper"]["open_rad"])
         self.assertEqual(sequence[0].gripper_rad, self.config["gripper"]["open_rad"])
-        self.assertEqual(sequence[3].gripper_rad, self.config["gripper"]["closed_rad"])
+        self.assertEqual(sequence[5].gripper_rad, self.config["gripper"]["closed_rad"])
+        self.assertEqual(
+            sequence[6].arm_deg,
+            tuple(self.config["picks"]["P1"]["descent"][-1]),
+        )
+        self.assertEqual(
+            sequence[7].arm_deg,
+            tuple(self.config["picks"]["P1"]["descent"][-2]),
+        )
+        self.assertEqual(
+            sequence[8].arm_deg,
+            tuple(self.config["picks"]["P1"]["above"]),
+        )
+        for index in (6, 7, 8):
+            self.assertEqual(sequence[index].gripper_rad, self.config["gripper"]["closed_rad"])
+            self.assertEqual(
+                sequence[index].duration_s,
+                self.config["motion"]["durations_s"]["descent_segment"],
+            )
         self.assertEqual(sequence[-1].arm_deg, tuple(self.config["home"]))
+
+        simple_sequence = self.build_sequence("P2", "BIN_A", self.config)
+        self.assertEqual(
+            [step.stage for step in simple_sequence],
+            [
+                "OPEN",
+                "PICK_ABOVE",
+                "PICK",
+                "CLOSE",
+                "LIFT",
+                "BIN_ABOVE",
+                "BIN_PLACE",
+                "RELEASE",
+                "RETREAT",
+                "HOME",
+            ],
+        )
+        self.assertEqual(
+            simple_sequence[4].duration_s,
+            self.config["motion"]["durations_s"]["vertical"],
+        )
+        self.assertEqual(
+            simple_sequence[4].gripper_rad,
+            self.config["gripper"]["closed_rad"],
+        )
 
 
 if __name__ == "__main__":

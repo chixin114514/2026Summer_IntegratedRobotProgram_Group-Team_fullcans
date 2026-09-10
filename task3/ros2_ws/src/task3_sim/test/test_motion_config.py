@@ -80,8 +80,16 @@ class MotionConfigTests(unittest.TestCase):
         poses.update(
             {
                 f"{grid}.{phase}": pose
-            for grid, phases in self.config["picks"].items()
-            for phase, pose in phases.items()
+                for grid, phases in self.config["picks"].items()
+                for phase, pose in phases.items()
+                if phase != "descent"
+            }
+        )
+        poses.update(
+            {
+                f"{grid}.descent_{index}": pose
+                for grid, phases in self.config["picks"].items()
+                for index, pose in enumerate(phases.get("descent", []))
             }
         )
         poses.update(
@@ -111,6 +119,13 @@ class MotionConfigTests(unittest.TestCase):
             self.config["picks"]["P1"]["pick"],
             [33.3541, 48.1151, -5.5796, -0.0058, 47.4603, 33.3584],
         )
+        self.assertEqual(
+            self.config["picks"]["P1"]["descent"],
+            [
+                [33.3627, 30.8631, -20.9472, 0.0, 80.0875, 33.3627],
+                [33.3626, 37.6076, -9.1040, 0.0, 61.4978, 33.3627],
+            ],
+        )
 
     def test_common_heights_gripper_values_and_motion_rate_are_defined(self):
         self.assertEqual(set(self.config["picks"]), set(EXPECTED_GRIDS))
@@ -127,6 +142,7 @@ class MotionConfigTests(unittest.TestCase):
                 "vertical": 1.2,
                 "gripper": 0.8,
                 "settle": 1.0,
+                "descent_segment": 0.6,
             },
         )
 
