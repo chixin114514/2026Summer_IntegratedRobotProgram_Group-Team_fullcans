@@ -105,11 +105,11 @@ class MotionConfigTests(unittest.TestCase):
     def test_p1_uses_measured_plus_y_gripper_center_correction(self):
         self.assertEqual(
             self.config["picks"]["P1"]["above"],
-            [31.2503, 28.8984, -39.0197, 0.0, 100.1141, 31.2503],
+            [33.3624, 31.7225, -43.2093, 0.0, 101.4797, 33.3624],
         )
         self.assertEqual(
             self.config["picks"]["P1"]["pick"],
-            [31.2505, 46.6227, -2.9438, -0.0001, 46.3239, 31.2506],
+            [33.3541, 48.1151, -5.5796, -0.0058, 47.4603, 33.3584],
         )
 
     def test_common_heights_gripper_values_and_motion_rate_are_defined(self):
