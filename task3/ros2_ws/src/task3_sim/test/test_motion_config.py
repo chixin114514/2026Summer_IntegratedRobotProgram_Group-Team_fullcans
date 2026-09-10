@@ -142,17 +142,17 @@ class MotionConfigTests(unittest.TestCase):
         self.assertEqual(set(self.config["bins"]), set(EXPECTED_BINS))
         self.assertEqual(self.config["heights"]["pickup_z"], self.config["heights"]["place_z"])
         self.assertEqual(self.config["gripper"]["open_rad"], 0.14)
-        self.assertEqual(self.config["gripper"]["closed_rad"], -0.50)
+        self.assertEqual(self.config["gripper"]["closed_rad"], -0.65)
         self.assertEqual(self.config["motion"]["command_rate_hz"], 20)
         self.assertEqual(
             self.config["motion"]["durations_s"],
             {
                 "home": 2.0,
                 "transfer": 2.0,
-                "vertical": 1.2,
-                "gripper": 0.8,
+                "vertical": 2.0,
+                "gripper": 1.2,
                 "settle": 1.0,
-                "descent_segment": 0.6,
+                "descent_segment": 1.5,
             },
         )
 

@@ -19,7 +19,7 @@ TASK3_DESCRIPTION_PACKAGE = TASK3_DESCRIPTION_ROOT / "package.xml"
 TASK3_DESCRIPTION_SETUP = TASK3_DESCRIPTION_ROOT / "setup.py"
 MESH_NAMES = ("base.dae", "link1.dae", "link2.dae", "link3.dae", "link4.dae", "link5.dae", "link6.dae")
 FROZEN_ASSET_SHA256 = {
-    "mecharm_270_gazebo.urdf": "2f5f94a2ed851dc6878b8b317bb465272bd61198200b3b521dfb7d97467138b1",
+    "mecharm_270_gazebo.urdf": "710de3793405fdb82edc677e70a489adf4c7f143a90c033dcad584f15ca28622",
     "base.dae": "f4f8868d9af882ccd0944e0c44c02b4057e4d345788e39a639e6538830943a73",
     "link1.dae": "a9cdff06a36ce6d8fdeb3ccf31e1934424c050126487fd8008716f58a5d009a0",
     "link2.dae": "a719dcbc3f409b2d52a7a2a5307317a92d2a1156d55d3965d5d875badf6fcac4",
