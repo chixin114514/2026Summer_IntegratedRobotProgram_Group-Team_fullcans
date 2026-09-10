@@ -17,6 +17,7 @@ from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64
 from tf2_msgs.msg import TFMessage
 
@@ -48,8 +49,18 @@ GRIPPER_COMMAND_TOPICS = tuple(
     f"/task3/gripper/{name}_cmd_pos" for name in GRIPPER_COMMAND_NAMES
 )
 POSE_TOPIC = "/task3/gazebo/pose/info"
+JOINT_STATE_TOPIC = "/task3/arm/joint_state"
 ACTION_NAME = "/task3/sort_object"
 POSE_SAMPLE = Tuple[float, float, float, float]
+MAX_JOINT_AGE_S = 0.5
+JOINT_ORDER = (
+    "joint1_to_base",
+    "joint2_to_joint1",
+    "joint3_to_joint2",
+    "joint4_to_joint3",
+    "joint5_to_joint4",
+    "joint6_to_joint5",
+)
 
 
 def _load_yaml(path: Path) -> dict:
@@ -98,6 +109,9 @@ class PickSortServer(Node):
         self._rate_hz = float(self.motion_config["motion"]["command_rate_hz"])
         if len(self._home) != 6 or self._rate_hz <= 0.0:
             raise ValueError("motion configuration has an invalid home or command rate")
+        closed_loop = self.motion_config.get("motion", {}).get("closed_loop", {})
+        self._settle_velocity_rad_s = float(closed_loop.get("settle_velocity_rad_s", 0.03))
+        self._hold_timeout_s = float(closed_loop.get("hold_timeout_s", 3.0))
 
         self._arm_publishers = tuple(
             self.create_publisher(Float64, topic, 10)
@@ -111,10 +125,12 @@ class PickSortServer(Node):
         self._callback_group = ReentrantCallbackGroup()
         self._pose_lock = threading.Lock()
         self._goal_lock = threading.Lock()
+        self._joint_lock = threading.Lock()
         self._poses: Dict[str, POSE_SAMPLE] = {}
         self._pose_history: Dict[str, Deque[POSE_SAMPLE]] = defaultdict(
             lambda: deque(maxlen=240)
         )
+        self._measured_arm = None  # (monotonic timestamp, six joint radians)
         self._last_arm = self._home
         self._last_gripper = self._open
         self._active_goal = None
@@ -126,6 +142,13 @@ class PickSortServer(Node):
             TFMessage,
             POSE_TOPIC,
             self._pose_callback,
+            10,
+            callback_group=self._callback_group,
+        )
+        self._joint_subscription = self.create_subscription(
+            JointState,
+            JOINT_STATE_TOPIC,
+            self._joint_callback,
             10,
             callback_group=self._callback_group,
         )
@@ -200,6 +223,32 @@ class PickSortServer(Node):
                 self._poses[name] = sample
                 self._pose_history[name].append(sample)
 
+    def _joint_callback(self, message: JointState) -> None:
+        positions = {
+            str(name): float(position)
+            for name, position in zip(message.name, message.position)
+        }
+        velocities = {
+            str(name): float(velocity)
+            for name, velocity in zip(message.name, message.velocity)
+        }
+        pos_values = [positions.get(name) for name in JOINT_ORDER]
+        vel_values = [velocities.get(name) for name in JOINT_ORDER]
+        if any(value is None for value in pos_values) or any(value is None for value in vel_values):
+            return
+        with self._joint_lock:
+            self._measured_arm = (time.monotonic(), tuple(pos_values), tuple(vel_values))
+
+    def _arm_settled(self) -> bool:
+        with self._joint_lock:
+            sample = self._measured_arm
+        if sample is None:
+            return False
+        timestamp, _positions, velocities = sample
+        if time.monotonic() - timestamp > MAX_JOINT_AGE_S:
+            return False
+        return max(abs(velocity) for velocity in velocities) <= self._settle_velocity_rad_s
+
     def _goal_callback(self, request) -> GoalResponse:
         with self._goal_lock:
             if not self._ready:
@@ -263,8 +312,12 @@ class PickSortServer(Node):
         index: int,
         total: int,
     ) -> bool:
-        start_arm = self._last_arm
-        start_gripper = self._last_gripper
+        start_arm = tuple(float(value) for value in self._last_arm)
+        start_gripper = float(self._last_gripper)
+        target_arm = tuple(float(value) for value in step.arm_deg)
+        target_gripper = float(step.gripper_rad)
+
+        # Phase 1: smooth open-loop ramp toward the target pose.
         ticks = max(1, int(round(step.duration_s * self._rate_hz)))
         for tick in range(1, ticks + 1):
             if goal_handle.is_cancel_requested:
@@ -272,9 +325,9 @@ class PickSortServer(Node):
             fraction = tick / ticks
             arm = tuple(
                 _smoothstep(start, target, fraction)
-                for start, target in zip(start_arm, step.arm_deg)
+                for start, target in zip(start_arm, target_arm)
             )
-            gripper = _smoothstep(start_gripper, step.gripper_rad, fraction)
+            gripper = _smoothstep(start_gripper, target_gripper, fraction)
             self._publish_arm(arm)
             self._publish_gripper(gripper)
             self._publish_feedback(
@@ -282,11 +335,29 @@ class PickSortServer(Node):
                 step.stage,
                 (index + fraction) / total,
             )
-            self._last_arm = tuple(arm)
-            self._last_gripper = float(gripper)
+            self._last_arm = arm
+            self._last_gripper = gripper
             time.sleep(1.0 / self._rate_hz)
-        self._last_arm = tuple(float(value) for value in step.arm_deg)
-        self._last_gripper = float(step.gripper_rad)
+
+        # Phase 2: settle gate.  Keep publishing the target and only advance
+        # once the measured joint velocities have dropped below the threshold,
+        # so the next waypoint starts from a settled (not still-swinging) arm.
+        dt = 1.0 / self._rate_hz
+        hold_ticks = max(1, int(round(self._hold_timeout_s * self._rate_hz)))
+        for _ in range(hold_ticks):
+            if goal_handle.is_cancel_requested:
+                return False
+            self._publish_arm(target_arm)
+            self._publish_gripper(target_gripper)
+            self._publish_feedback(goal_handle, step.stage, (index + 1.0) / total)
+            self._last_arm = target_arm
+            self._last_gripper = target_gripper
+            if self._arm_settled():
+                break
+            time.sleep(dt)
+
+        self._last_arm = target_arm
+        self._last_gripper = target_gripper
         self._publish_feedback(goal_handle, step.stage, (index + 1.0) / total)
         self._log("stage", stage=step.stage, progress=(index + 1.0) / total)
         return True

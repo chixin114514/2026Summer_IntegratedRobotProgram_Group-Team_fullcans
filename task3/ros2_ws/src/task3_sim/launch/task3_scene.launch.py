@@ -28,6 +28,7 @@ BRIDGE_ARGUMENTS = [
     "/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock",
     "/task3/camera/image_raw@sensor_msgs/msg/Image[ignition.msgs.Image",
     "/world/task3_world/pose/info@tf2_msgs/msg/TFMessage[ignition.msgs.Pose_V",
+    "/task2/gazebo/joint_state@sensor_msgs/msg/JointState[ignition.msgs.Model",
     "/task2/joint1/cmd_pos@std_msgs/msg/Float64]ignition.msgs.Double",
     "/task2/joint2/cmd_pos@std_msgs/msg/Float64]ignition.msgs.Double",
     "/task2/joint3/cmd_pos@std_msgs/msg/Float64]ignition.msgs.Double",
@@ -75,7 +76,8 @@ def generate_launch_description():
         name="task3_bridge",
         arguments=BRIDGE_ARGUMENTS,
         remappings=CONTROL_REMAPS
-        + [("/world/task3_world/pose/info", "/task3/gazebo/pose/info")],
+        + [("/world/task3_world/pose/info", "/task3/gazebo/pose/info")]
+        + [("/task2/gazebo/joint_state", "/task3/arm/joint_state")],
         output="screen",
     )
 

@@ -51,3 +51,8 @@ motion:
     gripper: 0.8
     settle: 1.0
     descent_segment: 0.6
+  # 收敛门：smoothstep 到位后持续发布目标，直到实测关节速度都降到
+  # settle_velocity_rad_s 以下（机械臂停稳）才推进下一路点，超时放行。
+  closed_loop:
+    settle_velocity_rad_s: 0.03
+    hold_timeout_s: 3.0

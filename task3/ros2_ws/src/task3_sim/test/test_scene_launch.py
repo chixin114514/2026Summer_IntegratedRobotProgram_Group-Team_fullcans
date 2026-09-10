@@ -106,13 +106,17 @@ class SceneLaunchTests(unittest.TestCase):
             self.assertTrue(ros_topic.startswith("/task3/"))
             self.assertTrue(any(argument.startswith(gazebo_topic + "@") for argument in bridges))
             self.assertNotEqual(gazebo_topic, ros_topic)
+        task2_bridges = [argument for argument in bridges if argument.startswith("/task2/")]
+        self.assertEqual(len(task2_bridges), 13)
         command_bridges = [
-            argument
-            for argument in bridges
-            if argument.startswith("/task2/")
+            argument for argument in task2_bridges if "]ignition.msgs.Double" in argument
+        ]
+        state_bridges = [
+            argument for argument in task2_bridges if "[ignition.msgs.Model" in argument
         ]
         self.assertEqual(len(command_bridges), 12)
-        self.assertTrue(all("]ignition.msgs.Double" in argument for argument in command_bridges))
+        self.assertEqual(len(state_bridges), 1)
+        self.assertTrue(state_bridges[0].startswith("/task2/gazebo/joint_state@"))
 
     def test_immutable_task2_topics_are_only_explicit_one_to_one_adapters(self):
         allowed_gazebo_topics = {
@@ -121,6 +125,7 @@ class SceneLaunchTests(unittest.TestCase):
                 f"/task2/gripper/{name}_cmd_pos"
                 for name in ("left3", "left2", "left1", "right3", "right2", "right1")
             ),
+            "/task2/gazebo/joint_state",
         }
         task2_topics = set(re.findall(r"/task2/[A-Za-z0-9_/]+", self.text))
         self.assertTrue(task2_topics)
