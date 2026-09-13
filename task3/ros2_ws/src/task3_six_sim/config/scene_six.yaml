@@ -1,0 +1,45 @@
+table:
+  size: [0.80, 0.70, 0.40]
+  top_z: 0.4
+arm: [0.0, 0.0]
+
+# Six pickup grids on an even 24.35 deg arc at r=0.165, so neighbouring blocks
+# (40 mm long) and the 42 mm-wide jaws stay clear of each other.  Each centre
+# is also the pad midpoint the solved pick pose reaches, so the block sits dead
+# centre between the open jaws when they close.
+grids:
+  P1: [0.136387, 0.092863]
+  P2: [0.091310, 0.137432]
+  P3: [0.032755, 0.161716]
+  P4: [-0.030635, 0.162131]
+  P5: [-0.089503, 0.138615]
+  P6: [-0.135160, 0.094640]
+
+# The action server sees six landing slots, but the world renders only two
+# large collection regions. Three slots lie inside each coloured region.
+bins:
+  YELLOW_1: [0.106557, -0.047883]
+  YELLOW_2: [0.144057, -0.026233]
+  YELLOW_3: [0.144057, -0.069533]
+  GREEN_1: [-0.072883, -0.131557]
+  GREEN_2: [-0.035383, -0.109907]
+  GREEN_3: [-0.035383, -0.153207]
+
+regions:
+  YELLOW: [0.131557, -0.047883]
+  GREEN: [-0.047883, -0.131557]
+
+objects:
+  yellow_1: {model: orange_battery_1, grid: P1, bin: YELLOW_1}
+  green_1: {model: green_can_1, grid: P2, bin: GREEN_1}
+  yellow_2: {model: orange_battery_2, grid: P3, bin: YELLOW_2}
+  green_2: {model: green_can_2, grid: P4, bin: GREEN_2}
+  yellow_3: {model: orange_battery_3, grid: P5, bin: YELLOW_3}
+  green_3: {model: green_can_3, grid: P6, bin: GREEN_3}
+
+camera:
+  topic: /task3_six/camera/image_raw
+  pose: [0.0, 0.0, 1.35, 0.0, 1.5708, 0.0]
+  image_size: [640, 480]
+  update_rate: 30
+  horizontal_fov: 1.05

@@ -1,0 +1,72 @@
+joint_names: [joint1_to_base, joint2_to_joint1, joint3_to_joint2, joint4_to_joint3, joint5_to_joint4, joint6_to_joint5]
+
+joint_limits_deg:
+  lower: [-160, -75, -175, -155, -115, -180]
+  upper: [160, 120, 65, 155, 115, 180]
+
+home: [0.0, 0.0, -20.0, 0.0, 110.0, 0.0]
+
+# Loaded transfer geometry. The planner copies J1/J6 from the source and
+# destination bearings: first lift without turning, then rotate without
+# lowering, and only descend after reaching the selected bin bearing.
+transfer_clearance: [0.0, 41.3163, -58.4704, 0.0, 107.1505, 0.0]
+
+picks:
+  P1:
+    # 2026-09-09 实测 gripper center 相对 object 为 -12.1 mm Y；target 向 +Y 校正约 12 mm。
+    # 2026-09-09 CLOSE 末端实测 pad 下沿高出 object top 约 22-23 mm；target_z 从 .038 降至 -.015（53 mm）。
+    # 2026-09-09 窄物体 CLOSE 快照沿 object local +Y 仍为 -6.8 mm；本次 target y 从 .08018 调至 .0870。
+    # J5 101.48 -> 80.09 -> 61.50 -> 47.46；computed XY bow 10 mm -> <= 1.7 mm。
+    # P1/BIN_A radial outward +10 mm; 20 mm full-pose IK unreachable, 15 mm joint margin ~3.9 deg too small; grasp target local +Y=(0.141018, 0.091582).
+    above: [33.0011, 41.3163, -58.4704, 0.0, 107.1505, 33.0011]
+    descent: [[33.0012, 37.2339, -30.5891, 0.0, 83.3572, 33.0012], [33.0012, 43.0785, -18.1624, 0.0, 65.0861, 33.0012]]
+    pick: [33.0011, 53.2161, -15.0315, 0.0, 51.8150, 33.0011]
+  P2:
+    above: [-57.2738, 24.7979, -33.2205, 0.0, 98.4168, -57.2738]
+    pick: [-57.2736, 28.4655, -5.3134, 0.0, 66.8504, -57.2736]
+  P3:
+    above: [122.7262, 24.7979, -33.2205, 0.0, 98.4168, 122.7262]
+    pick: [122.7264, 28.4655, -5.3134, 0.0, 66.8504, 122.7264]
+  P4:
+    # Exact 180-degree base/wrist rotation of the Gazebo-validated P1 path.
+    # Keeping J6 symmetric is essential: the earlier +33-degree wrist pose
+    # produced a different approach path and pushed the green can away.
+    # First lift and fold inward while facing forward, then rotate at that
+    # compact high pose. Link6 is about 100 mm higher and 130 mm closer to the
+    # base than at P4.above, so the final lowering happens only over P4.
+    approach: [[0.0, -30.0, -40.0, 0.0, 110.0, 0.0], [-146.9989, -30.0, -40.0, 0.0, 110.0, -146.9989]]
+    above: [-146.9989, 41.3163, -58.4704, 0.0, 107.1505, -146.9989]
+    descent: [[-146.9988, 37.2339, -30.5891, 0.0, 83.3572, -146.9988], [-146.9988, 43.0785, -18.1624, 0.0, 65.0861, -146.9988]]
+    pick: [-146.9989, 53.2161, -15.0315, 0.0, 51.8150, -146.9989]
+
+bins:
+  BIN_A:
+    above: [-15.0016, 19.9197, -29.4546, 0.0, 99.5326, -15.0016]
+    place: [-15.0015, 22.7137, 0.0203, 0.0, 67.2678, -15.0015]
+  BIN_B:
+    # Same radial/vertical geometry as BIN_A at a nearby -100-degree bearing.
+    above: [-100.0000, 19.9197, -29.4546, 0.0, 99.5326, -100.0000]
+    place: [-100.0000, 22.7137, 0.0203, 0.0, 67.2678, -100.0000]
+
+heights:
+  pickup_z: 0.418
+  place_z: 0.418
+
+gripper:
+  open_rad: 0.14
+  closed_rad: -0.65
+
+motion:
+  command_rate_hz: 20
+  durations_s:
+    home: 2.0
+    transfer: 2.0
+    vertical: 2.0
+    gripper: 1.2
+    settle: 1.0
+    descent_segment: 1.5
+  # 收敛门：smoothstep 到位后持续发布目标，直到实测关节速度都降到
+  # settle_velocity_rad_s 以下（机械臂停稳）才推进下一路点，超时放行。
+  closed_loop:
+    settle_velocity_rad_s: 0.03
+    hold_timeout_s: 3.0

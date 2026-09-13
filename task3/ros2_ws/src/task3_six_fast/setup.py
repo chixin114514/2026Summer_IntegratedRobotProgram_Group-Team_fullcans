@@ -2,7 +2,7 @@ from glob import glob
 from setuptools import find_packages, setup
 
 
-package_name = "task3_sim"
+package_name = "task3_six_fast"
 
 setup(
     name=package_name,
@@ -12,19 +12,17 @@ setup(
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
         ("share/" + package_name + "/launch", glob("launch/*.launch.py")),
-        ("share/" + package_name + "/worlds", glob("worlds/*.sdf")),
-        ("share/" + package_name + "/config", glob("config/*.yaml")),
-        ("share/" + package_name + "/urdf", glob("urdf/*.urdf")),
     ],
     install_requires=["setuptools"],
     entry_points={
         "console_scripts": [
-            "pick_sort_server = task3_sim.pick_sort_server:main",
+            "six_pick_sort_fast_server = "
+            "task3_six_fast.fast_pick_sort_server:main",
         ],
     },
     zip_safe=True,
     maintainer="Integrated Robot Program Group Team",
     maintainer_email="team@example.com",
-    description="Independent Task3 tabletop sorting simulation scene.",
+    description="Faster variant of the six-object sorting simulation.",
     license="MIT",
 )

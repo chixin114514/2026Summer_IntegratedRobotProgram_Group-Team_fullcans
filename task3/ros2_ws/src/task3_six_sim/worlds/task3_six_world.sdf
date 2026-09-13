@@ -1,0 +1,684 @@
+<?xml version="1.0"?>
+<sdf version="1.8">
+  <world name="task3_six_world">
+    <gravity>0 0 -9.81</gravity>
+    <plugin filename="libignition-gazebo-physics-system.so" name="ignition::gazebo::systems::Physics"/>
+    <plugin filename="libignition-gazebo-user-commands-system.so" name="ignition::gazebo::systems::UserCommands"/>
+    <plugin filename="libignition-gazebo-scene-broadcaster-system.so" name="ignition::gazebo::systems::SceneBroadcaster"/>
+    <plugin filename="libignition-gazebo-sensors-system.so" name="ignition::gazebo::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <physics name="task3_six_physics" type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+    <light name="sun" type="directional">
+      <pose>0 0 1 0 0 0</pose>
+      <cast_shadows>true</cast_shadows>
+      <direction>-0.5 0.2 -1.0</direction>
+      <diffuse>0.85 0.85 0.85 1</diffuse>
+      <specular>0.25 0.25 0.25 1</specular>
+    </light>
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.18 0.18 0.18 1</ambient>
+            <diffuse>0.30 0.30 0.30 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="table">
+      <static>true</static>
+      <pose>0 0 0.20 0 0 0</pose>
+      <link name="table_top">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.80 0.70 0.40</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.80 0.70 0.40</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.38 0.24 0.12 1</ambient>
+            <diffuse>0.58 0.34 0.16 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- Six independent pickup squares. -->
+    <model name="grid_p1">
+      <static>true</static>
+      <pose>0.136387 0.092863 0.402 0 0 0</pose>
+      <link name="grid">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.055 0.055 0.002</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.10 0.25 0.65 1</ambient>
+            <diffuse>0.15 0.42 0.95 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="grid_p2">
+      <static>true</static>
+      <pose>0.091310 0.137432 0.402 0 0 0</pose>
+      <link name="grid">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.055 0.055 0.002</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.10 0.25 0.65 1</ambient>
+            <diffuse>0.15 0.42 0.95 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="grid_p3">
+      <static>true</static>
+      <pose>0.032755 0.161716 0.402 0 0 0</pose>
+      <link name="grid">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.055 0.055 0.002</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.10 0.25 0.65 1</ambient>
+            <diffuse>0.15 0.42 0.95 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="grid_p4">
+      <static>true</static>
+      <pose>-0.030635 0.162131 0.402 0 0 0</pose>
+      <link name="grid">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.055 0.055 0.002</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.10 0.25 0.65 1</ambient>
+            <diffuse>0.15 0.42 0.95 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="grid_p5">
+      <static>true</static>
+      <pose>-0.089503 0.138615 0.402 0 0 0</pose>
+      <link name="grid">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.055 0.055 0.002</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.10 0.25 0.65 1</ambient>
+            <diffuse>0.15 0.42 0.95 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="grid_p6">
+      <static>true</static>
+      <pose>-0.135160 0.094640 0.402 0 0 0</pose>
+      <link name="grid">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.055 0.055 0.002</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.10 0.25 0.65 1</ambient>
+            <diffuse>0.15 0.42 0.95 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- Yellow collection region, with room for three 25 mm blocks. -->
+    <model name="yellow_region">
+      <static>true</static>
+      <pose>0.131557 -0.047883 0.40 0 0 0</pose>
+      <link name="floor">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.13 0.13 0.01</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.13 0.13 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.85 0.65 0.02 1</ambient>
+            <diffuse>1.0 0.88 0.05 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="wall_x_pos">
+        <pose>0.06 0 0.025 0 0 0</pose>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.01 0.13 0.04</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.01 0.13 0.04</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.85 0.65 0.02 1</ambient>
+            <diffuse>1.0 0.88 0.05 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="wall_x_neg">
+        <pose>-0.06 0 0.025 0 0 0</pose>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.01 0.13 0.04</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.01 0.13 0.04</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.85 0.65 0.02 1</ambient>
+            <diffuse>1.0 0.88 0.05 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="wall_y_pos">
+        <pose>0 0.06 0.025 0 0 0</pose>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.13 0.01 0.04</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.13 0.01 0.04</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.85 0.65 0.02 1</ambient>
+            <diffuse>1.0 0.88 0.05 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="wall_y_neg">
+        <pose>0 -0.06 0.025 0 0 0</pose>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.13 0.01 0.04</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.13 0.01 0.04</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.85 0.65 0.02 1</ambient>
+            <diffuse>1.0 0.88 0.05 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- Green collection region. -->
+    <model name="green_region">
+      <static>true</static>
+      <pose>-0.047883 -0.131557 0.40 0 0 0</pose>
+      <link name="floor">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.13 0.13 0.01</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.13 0.13 0.01</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.02 0.48 0.10 1</ambient>
+            <diffuse>0.05 0.88 0.18 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="wall_x_pos">
+        <pose>0.06 0 0.025 0 0 0</pose>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.01 0.13 0.04</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.01 0.13 0.04</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.02 0.48 0.10 1</ambient>
+            <diffuse>0.05 0.88 0.18 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="wall_x_neg">
+        <pose>-0.06 0 0.025 0 0 0</pose>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.01 0.13 0.04</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.01 0.13 0.04</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.02 0.48 0.10 1</ambient>
+            <diffuse>0.05 0.88 0.18 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="wall_y_pos">
+        <pose>0 0.06 0.025 0 0 0</pose>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.13 0.01 0.04</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.13 0.01 0.04</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.02 0.48 0.10 1</ambient>
+            <diffuse>0.05 0.88 0.18 1</diffuse>
+          </material>
+        </visual>
+      </link>
+      <link name="wall_y_neg">
+        <pose>0 -0.06 0.025 0 0 0</pose>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.13 0.01 0.04</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.13 0.01 0.04</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.02 0.48 0.10 1</ambient>
+            <diffuse>0.05 0.88 0.18 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- Yellow blocks retain the orange_battery prefix required by the shared
+         measured-pose server, but are rendered as true yellow blocks. -->
+    <model name="orange_battery_1">
+      <static>false</static>
+      <pose>0.136387 0.092863 0.4250 0 0 0</pose>
+      <link name="body">
+        <inertial>
+          <mass>0.08</mass>
+          <inertia>
+            <ixx>0.00001</ixx>
+            <iyy>0.00001</iyy>
+            <izz>0.00001</izz>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.040 0.018 0.050</size>
+            </box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>2.0</mu>
+                <mu2>2.0</mu2>
+              </ode>
+            </friction>
+            <contact><ode><kp>200000</kp><kd>100</kd></ode></contact>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.040 0.018 0.050</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.02 1</ambient>
+            <diffuse>1.0 0.92 0.05 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="orange_battery_2">
+      <static>false</static>
+      <pose>0.032755 0.161716 0.4250 0 0 0</pose>
+      <link name="body">
+        <inertial>
+          <mass>0.08</mass>
+          <inertia>
+            <ixx>0.00001</ixx>
+            <iyy>0.00001</iyy>
+            <izz>0.00001</izz>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.040 0.018 0.050</size>
+            </box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>2.0</mu>
+                <mu2>2.0</mu2>
+              </ode>
+            </friction>
+            <contact><ode><kp>200000</kp><kd>100</kd></ode></contact>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.040 0.018 0.050</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.02 1</ambient>
+            <diffuse>1.0 0.92 0.05 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="orange_battery_3">
+      <static>false</static>
+      <pose>-0.089503 0.138615 0.4250 0 0 0</pose>
+      <link name="body">
+        <inertial>
+          <mass>0.08</mass>
+          <inertia>
+            <ixx>0.00001</ixx>
+            <iyy>0.00001</iyy>
+            <izz>0.00001</izz>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.040 0.018 0.050</size>
+            </box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>2.0</mu>
+                <mu2>2.0</mu2>
+              </ode>
+            </friction>
+            <contact><ode><kp>200000</kp><kd>100</kd></ode></contact>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.040 0.018 0.050</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.95 0.72 0.02 1</ambient>
+            <diffuse>1.0 0.92 0.05 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="green_can_1">
+      <static>false</static>
+      <pose>0.091310 0.137432 0.4250 0 0 0</pose>
+      <link name="body">
+        <inertial>
+          <mass>0.08</mass>
+          <inertia>
+            <ixx>0.00001</ixx>
+            <iyy>0.00001</iyy>
+            <izz>0.00001</izz>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.040 0.018 0.050</size>
+            </box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>2.0</mu>
+                <mu2>2.0</mu2>
+              </ode>
+            </friction>
+            <contact><ode><kp>200000</kp><kd>100</kd></ode></contact>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.040 0.018 0.050</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.02 0.60 0.10 1</ambient>
+            <diffuse>0.04 0.95 0.18 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="green_can_2">
+      <static>false</static>
+      <pose>-0.030635 0.162131 0.4250 0 0 0</pose>
+      <link name="body">
+        <inertial>
+          <mass>0.08</mass>
+          <inertia>
+            <ixx>0.00001</ixx>
+            <iyy>0.00001</iyy>
+            <izz>0.00001</izz>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.040 0.018 0.050</size>
+            </box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>2.0</mu>
+                <mu2>2.0</mu2>
+              </ode>
+            </friction>
+            <contact><ode><kp>200000</kp><kd>100</kd></ode></contact>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.040 0.018 0.050</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.02 0.60 0.10 1</ambient>
+            <diffuse>0.04 0.95 0.18 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="green_can_3">
+      <static>false</static>
+      <pose>-0.135160 0.094640 0.4250 0 0 0</pose>
+      <link name="body">
+        <inertial>
+          <mass>0.08</mass>
+          <inertia>
+            <ixx>0.00001</ixx>
+            <iyy>0.00001</iyy>
+            <izz>0.00001</izz>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.040 0.018 0.050</size>
+            </box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>2.0</mu>
+                <mu2>2.0</mu2>
+              </ode>
+            </friction>
+            <contact><ode><kp>200000</kp><kd>100</kd></ode></contact>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.040 0.018 0.050</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.02 0.60 0.10 1</ambient>
+            <diffuse>0.04 0.95 0.18 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="overhead_camera">
+      <static>true</static>
+      <pose>0 0 1.35 0 1.5708 0</pose>
+      <link name="camera_link">
+        <sensor name="rgb_camera" type="camera">
+          <always_on>true</always_on>
+          <update_rate>30</update_rate>
+          <visualize>true</visualize>
+          <topic>/task3_six/camera/image_raw</topic>
+          <camera>
+            <horizontal_fov>1.05</horizontal_fov>
+            <image>
+              <width>640</width>
+              <height>480</height>
+              <format>R8G8B8</format>
+            </image>
+            <clip>
+              <near>0.1</near>
+              <far>10.0</far>
+            </clip>
+          </camera>
+        </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>

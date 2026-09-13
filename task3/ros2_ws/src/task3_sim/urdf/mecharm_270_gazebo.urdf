@@ -497,8 +497,8 @@
 
     <limit
       effort="8.0"
-      lower="-0.50"
-      upper="0.50"
+      lower="-0.70"
+      upper="0.70"
       velocity="1.2"/>
 
     <dynamics damping="0.20" friction="0.05"/>
@@ -670,8 +670,8 @@
 
     <limit
       effort="8.0"
-      lower="-0.50"
-      upper="0.50"
+      lower="-0.70"
+      upper="0.70"
       velocity="1.2"/>
 
     <dynamics damping="0.20" friction="0.05"/>

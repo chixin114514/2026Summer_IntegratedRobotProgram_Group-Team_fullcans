@@ -133,10 +133,10 @@ class SceneWorldTests(unittest.TestCase):
         self.assertTrue(_near(table_pose[2], 0.20))
 
         expected = {
-            "grid_p1": (0.16, 0.14),
-            "grid_p2": (0.16, -0.14),
-            "grid_p3": (-0.16, 0.14),
-            "grid_p4": (-0.16, -0.14),
+            "grid_p1": (0.141018, 0.072702),
+            "grid_p2": (0.08037, -0.12506),
+            "grid_p3": (-0.08037, 0.12506),
+            "grid_p4": (-0.141018, -0.072702),
         }
         for name, (x, y) in expected.items():
             grid = self.world.find(f"model[@name='{name}']")
@@ -163,10 +163,14 @@ class SceneWorldTests(unittest.TestCase):
             self.assertIsNotNone(model.find(".//link/collision/surface/friction"))
 
         orange_size = _floats(orange.find(".//collision/geometry/box/size").text)
-        self.assertEqual(orange_size, [0.070, 0.035, 0.035])
-        green_cylinder = green.find(".//collision/geometry/cylinder")
-        self.assertEqual(float(green_cylinder.findtext("radius")), 0.0175)
-        self.assertEqual(float(green_cylinder.findtext("length")), 0.070)
+        self.assertEqual(orange_size, [0.070, 0.025, 0.025])
+        green_collision = _floats(green.find(".//collision/geometry/box/size").text)
+        self.assertEqual(green_collision, [0.025, 0.025, 0.070])
+        green_visual = green.find(".//visual/geometry/cylinder")
+        self.assertEqual(float(green_visual.findtext("radius")), 0.0125)
+        self.assertEqual(float(green_visual.findtext("length")), 0.070)
+        self.assertTrue(_near(_floats(orange.findtext("pose"))[2], 0.4130))
+        self.assertTrue(_near(_floats(green.findtext("pose"))[2], 0.4130))
         green_pose = _floats(green.findtext("pose"))
         self.assertTrue(_near(green_pose[3], 0.0) and _near(green_pose[4], 1.5708), green_pose)
 
@@ -186,15 +190,23 @@ class SceneWorldTests(unittest.TestCase):
         green = self.world.find("model[@name='green_can_1']")
         orange_pose = _floats(orange.findtext("pose"))
         orange_size = _floats(orange.find(".//collision/geometry/box/size").text)
+        self.assertTrue(_near(orange_pose[0], 0.141018))
+        self.assertTrue(_near(orange_pose[1], 0.072702))
         orange_lowest = orange_pose[2] - orange_size[2] / 2.0
 
         green_pose = _floats(green.findtext("pose"))
-        green_radius = float(green.find(".//collision/geometry/cylinder/radius").text)
-        green_lowest = green_pose[2] - green_radius
+        self.assertTrue(_near(green_pose[0], -0.141018))
+        self.assertTrue(_near(green_pose[1], -0.072702))
+        # The local box Z axis is rotated onto world X, leaving local Y as
+        # world Y and local X (25 mm) as the vertical extent.
+        green_box = _floats(green.find(".//collision/geometry/box/size").text)
+        green_lowest = green_pose[2] - green_box[0] / 2.0
 
         # Grid markers have no collision, so the physical support is the table.
         # Keep a 0.5 mm clearance to avoid initial object/table penetration.
         support_clearance = 0.0005
+        self.assertTrue(_near(orange_lowest, 0.4005))
+        self.assertTrue(_near(green_lowest, 0.4005))
         self.assertGreaterEqual(orange_lowest, table_top + support_clearance - 1e-6)
         self.assertGreaterEqual(green_lowest, table_top + support_clearance - 1e-6)
 
@@ -203,14 +215,14 @@ class SceneWorldTests(unittest.TestCase):
         self.assertEqual(self.config["table"]["top_z"], 0.4)
         self.assertEqual(self.config["arm"], [0.0, 0.0])
         self.assertEqual(self.config["grids"], {
-            "P1": [0.16, 0.14],
-            "P2": [0.16, -0.14],
-            "P3": [-0.16, 0.14],
-            "P4": [-0.16, -0.14],
+            "P1": [0.141018, 0.072702],
+            "P2": [0.08037, -0.12506],
+            "P3": [-0.08037, 0.12506],
+            "P4": [-0.141018, -0.072702],
         })
         self.assertEqual(self.config["bins"], {
-            "BIN_A": [0.16, 0.0],
-            "BIN_B": [-0.16, 0.0],
+            "BIN_A": [0.135229, -0.036238],
+            "BIN_B": [-0.024314, -0.137873],
         })
         self.assertEqual(self.config["camera"]["topic"], "/task3/camera/image_raw")
 

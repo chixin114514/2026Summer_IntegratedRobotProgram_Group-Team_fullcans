@@ -3,13 +3,17 @@ table:
   top_z: 0.4
 arm: [0.0, 0.0]
 grids:
-  P1: [0.16, 0.14]
-  P2: [0.16, -0.14]
-  P3: [-0.16, 0.14]
-  P4: [-0.16, -0.14]
+  P1: [0.141018, 0.072702]
+  P2: [0.08037, -0.12506]
+  P3: [-0.08037, 0.12506]
+  # Exact 180-degree rotation of the Gazebo-validated P1 pickup centre.
+  P4: [-0.141018, -0.072702]
 bins:
-  BIN_A: [0.16, 0.0]
-  BIN_B: [-0.16, 0.0]
+  BIN_A: [0.135229, -0.036238]
+  # Same radius and joint geometry as BIN_A at a -100-degree bearing.  This
+  # keeps the loaded P4->BIN_B transfer to 47 degrees instead of crossing the
+  # full -147..+155 numeric joint range and dropping the object mid-swing.
+  BIN_B: [-0.024314, -0.137873]
 objects:
   orange_battery:
     model: orange_battery_1
