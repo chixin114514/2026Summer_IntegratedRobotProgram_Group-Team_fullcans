@@ -1,0 +1,130 @@
+# =====================================================================
+# Task3 真机视觉分拣 配置
+#
+# 坐标系：原点 = 机械臂底座中心；+X = J1=0 时手臂伸出方向；
+#         +Y = 逆时针 90°；+Z = 向上；单位 = 米
+# =====================================================================
+
+robot:
+  # socket = 走网口（MechArm 270 Pi，推荐，和 tak2 的 device.yaml 一致）
+  # serial = 走 USB 串口
+  driver_type: socket
+  robot_ip: "192.168.31.247"
+  robot_port: 9000
+  serial_device: "/dev/ttyUSB0"
+  baudrate: 115200
+
+  # 关节运动速度百分比。真机首轮建议 20 以内，确认轨迹没问题再加快。
+  arm_speed_percent: 20
+
+  # 夹爪：pymycobot 的 set_gripper_value，100 = 全开，0 = 夹到底
+  gripper_open_value: 100
+  gripper_close_value: 0        # “往死里夹”就是直接给 0
+  gripper_speed_percent: 100
+  gripper_type: 1
+  gripper_settle_s: 1.0         # 真夹爪没有位置反馈，只能按时间等
+
+  # 一次 send_angles 之后，等六个关节都进入容差并稳定多久算到位
+  arrival_tolerance_deg: 3.0
+  arrival_stable_s: 0.4
+  arrival_timeout_s: 25.0       # 超时只记录日志，不中止
+  poll_period_s: 0.2
+
+camera:
+  # Task1 的 xby.py 发布的话题（std_msgs/String, JSON）
+  detections_topic: "/yolo/detections"
+  image_size: [640, 480]
+  # 连续几帧目标数一致才动手（相机 5~8 FPS，2 帧足够）
+  confirm_frames: 2
+  # 检测结果超过这个时间算过期
+  max_age_s: 2.0
+  # 低于这个置信度不抓
+  min_confidence: 0.5
+  # bbox 中心 -> 物体中心的像素微调（先用 0，需要时再调）
+  pixel_offset: [0.0, 0.0]
+
+# ---------------------------------------------------------------------
+# 桌面标定。不要手改，由 calibrate_table 写到下面这个文件里：
+#   ~/.ros/task3_table_calibration.yaml
+# 这里留 null 表示“必须先去标定”。
+# ---------------------------------------------------------------------
+table_calibration:
+  homography: null
+
+geometry:
+  # base_z 加在所有 z 上。设 0 表示所有高度都从机械臂底面算起，
+  # 也就是机械臂装在桌面上时，下面的 z 值就是"离桌面的高度"。
+  base_z_m: 0.0
+
+  # 夹爪两片橡胶垫的中点要到达的高度（相对桌面）
+  pick_pad_z_m: 0.026      # 抓取高度：略高于桌面，夹到物体中部
+  place_pad_z_m: 0.030     # 放料高度（松手瞬间）
+  above_offset_m: 0.100    # “above” 抬升量
+  pre_pick_offset_m: 0.030 # 抓取前悬停量
+  transfer_offset_m: 0.170 # 抬起转运高度
+
+  # 目标中心的手动 XY 微调（米）。如果发现总是偏同一个方向，改这里。
+  pick_xy_offset: [0.0, 0.0]
+
+  # 末端姿态固定：J4 = 0，J6 = J1（夹爪闭合方向始终平行世界轴）
+  fixed_j4_deg: 0.0
+  # IK 里建模用的夹爪角度（只影响橡胶垫位置几个毫米，一般不用改）
+  ik_grip_rad: 0.14
+  # IK 初始种子 (J2, J3, J5)，取自仿真里标定好的抓取构型
+  ik_seed_q: [54.76, -14.71, 51.36]
+
+limits:
+  # 和 tak2/config/safety.yaml 完全一致
+  lower: [-160.0, -75.0, -175.0, -155.0, -115.0, -180.0]
+  upper: [160.0, 120.0, 65.0, 155.0, 115.0, 180.0]
+
+# ---------------------------------------------------------------------
+# 类别 -> 落料区
+# key 必须和 /yolo/detections 里 class_name 一字不差（注意大小写）
+# 启动时节点会打印它实际见到过的类别名，对不上就照着改
+# ---------------------------------------------------------------------
+classes:
+  charger:
+    region: A
+  staple_shell:
+    region: B
+
+  # 名字对不上时的兜底：按 class_id 分
+  by_id:
+    0: A
+    1: B
+
+# ---------------------------------------------------------------------
+# 落料区与槽位
+# centre/exclude_radius_m：用来判断"这个物体已经在区域里了，别再抓"
+# slots：可用落料位，按顺序占用；物体多于槽位时复用最后一个
+# ---------------------------------------------------------------------
+regions:
+  A:
+    centre: [0.1316, -0.0479]
+    exclude_radius_m: 0.090
+    slots:
+      - [0.1550, -0.0300]
+      - [0.1550, -0.0700]
+      - [0.1150, -0.0350]
+      - [0.1150, -0.0750]
+  B:
+    centre: [-0.0479, -0.1316]
+    exclude_radius_m: 0.090
+    slots:
+      - [-0.0300, -0.1550]
+      - [-0.0700, -0.1550]
+      - [-0.0350, -0.1150]
+      - [-0.0750, -0.1150]
+
+run:
+  max_objects: 6
+  passes: 1
+  log_path: "~/.ros/task3_vision_sort.jsonl"
+  step_pause_s: 0.2
+  # 开始前先回到 home 姿态，保证起点已知。不想让它动就改 false。
+  startup_home: true
+  home: [0.0, 0.0, -20.0, 0.0, 110.0, 0.0]
+  # 退出时是否给舵机松力。默认 false —— 松力之后手臂会直接掉下来，
+  # 只有要用手搬动机械臂之前才改成 true。
+  release_servos_at_end: false

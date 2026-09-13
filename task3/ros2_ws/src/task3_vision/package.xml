@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>task3_vision</name>
+  <version>0.1.0</version>
+  <description>
+    Task3 真机视觉分拣：YOLO 像素框 + 桌面单应标定 -> 桌面 XY -> J1/IK ->
+    MechArm 270 抓取并投放到对应类别区域。
+  </description>
+  <maintainer email="boff868@users.noreply.github.com">boff868</maintainer>
+  <license>MIT</license>
+
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>python3-yaml</depend>
+
+  <!-- 复用 task3_six_sim 的正运动学（kinematics.pad_mid），
+       保证解算和仿真里标定过的模型完全一致。 -->
+  <exec_depend>task3_six_sim</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
