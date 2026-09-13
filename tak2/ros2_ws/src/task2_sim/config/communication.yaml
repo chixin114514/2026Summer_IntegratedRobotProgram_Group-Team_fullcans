@@ -34,9 +34,8 @@ simulation:
   clock_topic: /clock
   object_pose_topic: /world/task2_world/pose/info
 real:
-  driver_type: ros2
-  serial_device: /dev/ttyUSB0
-  baudrate: 115200
+  # Transport/device selection lives only in device.yaml.real.
+  # This section contains ROS topic names only.
   joint_command_topic: /mecharm270/joint_command
   joint_state_topic: /joint_states
   gripper_command_topic: /mecharm270/gripper_command

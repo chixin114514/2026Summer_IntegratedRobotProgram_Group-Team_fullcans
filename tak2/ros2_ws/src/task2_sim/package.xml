@@ -1,24 +1,14 @@
 <?xml version="1.0"?>
-
 <package format="3">
-
   <name>task2_sim</name>
-
-  <version>0.2.1</version>
-
+  <version>0.4.0</version>
   <description>
-    ROS 2 simulation package for the Task 2 fixed-point
-    pick-and-place experiment using MechArm 270.
+    ROS 2 Task 2 fixed-point pick-and-place package for MechArm 270,
+    supporting Gazebo simulation and feedback-closed real-robot execution.
   </description>
-
-  <maintainer email="team@example.com">
-    Integrated Robot Program Group Team
-  </maintainer>
-
+  <maintainer email="team@example.com">Integrated Robot Program Group Team</maintainer>
   <license>MIT</license>
-
   <buildtool_depend>ament_python</buildtool_depend>
-
   <exec_depend>rclpy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
@@ -27,13 +17,11 @@
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>python3-yaml</exec_depend>
-
   <exec_depend>robot_state_publisher</exec_depend>
   <exec_depend>ros_ign_bridge</exec_depend>
   <exec_depend>mycobot_description</exec_depend>
-
+  <test_depend>python3-pytest</test_depend>
   <export>
     <build_type>ament_python</build_type>
   </export>
-
 </package>

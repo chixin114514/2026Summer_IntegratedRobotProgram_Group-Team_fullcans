@@ -1,4 +1,7 @@
 joint_limits_deg:
+  # Existing project limits are intentionally retained. Before physical
+  # acceptance, verify them against the exact MechArm 270 Pi firmware/model
+  # in use; this patch does not silently recalibrate hardware limits.
   joint1:
     min: -160.0
     max: 160.0
@@ -23,10 +26,16 @@ cartesian:
   ik_position_tolerance_m: 0.005
   ik_orientation_tolerance_deg: 3.0
 motion:
-  # Debug / commissioning switch.
-  # false = bypass ROS automatic SAFE_STOP checks.
-  software_safety_enabled: false
+  # Final acceptance must latch software faults instead of logging and
+  # continuing the state machine.
+  software_safety_enabled: true
   real_low_speed_required: true
+
+  # Simulation still uses interpolated commands and therefore keeps its
+  # per-command step check. In formal real queued mode the complete target
+  # can legitimately differ by more than 3 degrees; firmware interpolates
+  # the physical motion and safety is enforced by hard limits, fresh measured
+  # feedback, goal tolerances, feedback timeout and motion timeout.
   maximum_joint_step_deg_simulation: 6.5
   maximum_joint_step_deg_real: 3.0
 failure_policy:
