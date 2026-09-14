@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>fixed_joint_sorter</name>
+  <version>4.1.0</version>
+  <description>Initial six-object scan followed by camera-independent fixed-angle sorting.</description>
+  <maintainer email="student@example.com">robot-team</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_python</buildtool_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <test_depend>python3-pytest</test_depend>
+  <export><build_type>ament_python</build_type></export>
+</package>
