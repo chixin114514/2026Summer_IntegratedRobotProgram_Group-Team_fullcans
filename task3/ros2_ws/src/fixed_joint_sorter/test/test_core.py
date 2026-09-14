@@ -22,11 +22,11 @@ class CoreTests(unittest.TestCase):
             "P4": "charger", "P5": "stapler_box", "P6": "charger",
         })
 
-    def test_open_loop_does_not_read_angles(self):
+    def test_open_loop_does_not_read_coords(self):
         class Client:
             def __init__(self):
                 self.sent = []
-            def send_angles(self, target, speed, _async=True):
+            def send_coords(self, target, speed, _async=True):
                 self.sent.append(target)
                 return -1
             def get_angles(self):

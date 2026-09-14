@@ -17,9 +17,9 @@ class JointRobot:
     def _send_async(self, target):
         speed = int(self.cfg["robot"]["arm_speed"])
         try:
-            return self.client.send_angles(list(map(float, target)), speed, _async=True)
+            return self.client.send_coords(list(map(float, target)), speed, _async=True)
         except TypeError:
-            return self.client.send_angles(list(map(float, target)), speed)
+            return self.client.send_coords(list(map(float, target)), speed)
 
     def move(self, target, label):
         ack = self._send_async(target)
