@@ -1,140 +1,84 @@
-# Task 2 - 机械臂定点抓取实验
+# Task 2: Fixed-point pick and place
 
-## 1. 实验简介
+Task 2 moves a MechArm 270 between a fixed pickup point and a fixed drop point. The same ROS 2 state machine supports Ignition Gazebo, normal real-robot operation, and a real-robot diagnostic mode. It does not use camera-based object localization.
 
-本目录用于完成机械臂定点抓取实验。
+The formal motion sequence is:
 
-实验分为两个阶段：
+`HOME -> OPEN_GRIPPER_INITIAL -> A_SAFE -> A_PREGRASP -> A_PICK -> CLOSE_GRIPPER -> A_LIFT -> B_SAFE -> B_PLACE -> RELEASE_GRIPPER_PARTIAL -> OPEN_GRIPPER -> B_LIFT -> RETURN_HOME`
 
-1. 仿真开发
-2. 真机验证
+## Requirements
 
-首先在 ROS 2 和 Gazebo 仿真环境中完成机械臂抓取任务，在仿真满足要求后，再将相同的 ROS 2 控制接口应用于真实机械臂。
+- Ubuntu 22.04 and ROS 2 Humble
+- Ignition Gazebo and `ros_ign_bridge` for simulation
+- `robot_state_publisher` and PyYAML
+- `pymycobot` for real-robot modes
+- A MechArm 270 Pi reachable through the socket or serial settings in `device.yaml` for hardware runs
 
-本实验不涉及视觉定位，目标物体的抓取位置和放置位置均为预先设定的固定位置。
+## Workspace layout
 
-## 2. 开发环境
+- `ros2_ws/src/task2_sim/launch/task2.launch.py`: formal launch file
+- `ros2_ws/src/task2_sim/config/device.yaml`: simulation or hardware mode and connection settings
+- `ros2_ws/src/task2_sim/config/task_points.yaml`: HOME, pickup, drop, timing, and acceptance settings
+- `ros2_ws/src/task2_sim/config/safety.yaml`: joint limits and safety checks
+- `ros2_ws/src/task2_sim/task2_sim/task_manager.py`: task state machine
+- `ros2_ws/src/task2_sim/launch/README.md`: list of legacy launch files that are excluded from acceptance runs
 
-当前使用或计划使用：
+## Build
 
-- Ubuntu 22.04
-- ROS 2 Humble
-- Gazebo
-- ros2_control
-- MoveIt 2
-- Jetson Orin
-- mechArm 270
+```bash
+cd tak2/ros2_ws
+source /opt/ros/humble/setup.bash
+colcon build --merge-install --packages-select mycobot_description task2_sim
+source install/setup.bash
+```
 
-开发流程：
+## Select a mode
 
-Mac
-→ 编写代码
-→ Git commit / push
-→ GitHub
-→ Jetson git pull
-→ ROS 2 编译
-→ Gazebo 仿真
+Set `mode` in `ros2_ws/src/task2_sim/config/device.yaml` before building:
 
-## 3. 仿真任务
+| Mode | Operation |
+| --- | --- |
+| `0` | Ignition Gazebo simulation with automatic acceptance trials |
+| `1` | Real robot with automatic acceptance trials |
+| `2` | Real robot diagnostic mode for one named state at a time |
 
-仿真环境需要建立：
+The checked-in configuration currently uses mode `2`. Review the robot IP, port or serial device, speed, calibrated waypoints, and safety limits before starting either hardware mode. Keep the arm area clear and make sure an emergency stop is available.
 
-- 机械臂
-- 夹爪
-- 桌面
-- 固定目标物体
+## Run the formal workflow
 
-同时设置：
+```bash
+ros2 launch task2_sim task2.launch.py
+```
 
-- 固定取物点 A
-- 固定放置点 B
-- 安全高度
+Modes `0` and `1` start the experiment manager after the other nodes are ready. The configured acceptance run performs five trials and requires four successful trials.
 
-机械臂执行流程：
+Mode `2` does not start the experiment manager. Send one existing state name through the diagnostic topic after the launch is ready:
 
-回零
-→ 移动到取物点 A 上方
-→ 下降
-→ 夹取目标物
-→ 抬升
-→ 移动到放置点 B
-→ 释放目标物
-→ 回零
+```bash
+ros2 topic pub --once /task2/debug_state_request \
+  std_msgs/msg/String "{data: 'HOME'}"
+```
 
-## 4. ROS 2 控制
+Valid names are the states shown in the formal motion sequence. The node publishes `DEBUG_COMPLETED: <STATE>` after the requested state finishes. `/task2/task_start` is rejected in mode `2`.
 
-后续通过 ROS 2 节点或 Action 控制机械臂。
+## Results
 
-主要功能包括：
+Each launch creates timestamped files under `~/task2_results/`:
 
-- 机械臂回零
-- 关节控制
-- 夹爪控制
-- 定点抓取
-- 机械臂状态发布
-- 轨迹执行
-- 异常处理
+- `trajectory_<timestamp>.csv`
+- `task_results_<timestamp>.csv`
+- `errors_<timestamp>.log`
 
-最终使用一个 Launch 文件启动完整仿真系统。
+The simulation result monitor uses measured object pose and joint feedback. Real-robot motion states wait for fresh measured joint feedback before the next target is sent. Gripper completion remains time based because the current hardware path has no gripper position feedback.
 
-## 5. 异常处理
+## Tests
 
-程序需要处理：
+```bash
+cd tak2/ros2_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+colcon test --packages-select task2_sim
+colcon test-result --verbose
+```
 
-- 目标位置不可达
-- 逆运动学无解
-- 关节超过限制
-- 轨迹规划失败
-- 控制执行失败
-
-遇到异常时，应停止任务并输出明确错误信息。
-
-## 6. 仿真验收目标
-
-- 一个 Launch 文件启动完整仿真系统
-- 连续执行 5 次抓取，至少成功 4 次
-- 机械臂无明显碰撞
-- 不超过关节限位
-- 不可达目标能够安全停止
-- 保存机械臂轨迹
-- 保存执行结果
-- 保存错误日志
-
-## 7. 真机验证
-
-完成仿真后，将控制程序迁移至 mechArm 270。
-
-原则上保持任务逻辑不变，只修改：
-
-- 设备配置
-- 通信配置
-- 位置参数
-
-## 8. Git 开发规范
-
-开发过程中遵循：
-
-完成一个独立代码阶段
-→ 运行验证
-→ git add
-→ git commit
-→ git push
-→ 再进入下一阶段
-
-## 9. 当前进度
-
-- [x] Jetson Ubuntu 22.04 环境确认
-- [x] ROS 2 Humble 环境确认
-- [x] colcon 环境确认
-- [ ] Gazebo 安装
-- [ ] ros2_control 安装
-- [ ] MoveIt 2 安装
-- [ ] ROS 2 仿真包创建
-- [ ] 机械臂模型加载
-- [ ] Gazebo 场景搭建
-- [ ] 机械臂运动控制
-- [ ] 完整定点抓取流程
-- [ ] 异常处理
-- [ ] 单 Launch 启动
-- [ ] 5 次连续抓取测试
-- [ ] 真机验证
+Use `task2.launch.py` for acceptance work. `task2_sim.launch.py`, `task2_auto.launch.py`, and `task2_tune.launch.py` remain in the package for older experiments and tuning.
