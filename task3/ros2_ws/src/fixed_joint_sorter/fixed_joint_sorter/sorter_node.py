@@ -10,7 +10,7 @@ from std_msgs.msg import String
 
 from .config import ConfigError, load_config, validate_config
 from .detection import classify_initial_layout, parse_message
-from .robot import JointRobot, RobotError
+from .robot import JointRobot, RobotError, run_pick_place_cycle
 
 
 class FixedSorter(Node):
@@ -47,66 +47,33 @@ class FixedSorter(Node):
     def wait_for_initial_layout(self):
         timeout = float(self.cfg["vision"].get("classification_timeout_s", 0))
         deadline = None if timeout <= 0 else time.monotonic() + timeout
-        previous = None
-        last_log = 0.0
         while True:
             result = self.initial_classifications()
-            if result != previous:
-                self.get_logger().info("初始分类进度 {}/6: {}".format(len(result), result))
-                previous = result
             if len(result) == 6:
                 return result
-            if time.monotonic() - last_log >= 1.0:
-                self.get_logger().info("保持6个物块和摄像头不动，等待初始分类稳定...")
-                last_log = time.monotonic()
             if deadline is not None and time.monotonic() > deadline:
                 raise RuntimeError("初始 YOLO 分类等待超时")
             time.sleep(0.1)
 
     def execute(self):
         classes = self.wait_for_initial_layout()
-        self.get_logger().info("========== 初始判断完成 ==========")
-        for station in self.cfg["stations"]:
-            class_name = classes[station["name"]]
-            bin_name = self.cfg["class_routes"][class_name]
-            label = self.cfg["bins"][bin_name]["label"]
-            self.get_logger().info("{} = {} -> {}".format(station["name"], class_name, label))
         routed_counts = Counter(self.cfg["class_routes"][class_name] for class_name in classes.values())
         for bin_name, bin_cfg in self.cfg["bins"].items():
-            if routed_counts[bin_name] != len(bin_cfg["slots"]):
-                raise RuntimeError("初始分类数量异常：{} 有 {} 个物块，但只有 {} 个槽；请检查识别".format(bin_name, routed_counts[bin_name], len(bin_cfg["slots"])))
-        self.get_logger().info("分类结果已锁定。后续不再读取摄像头，现在开始机械臂流程；摄像头可以关闭。")
+            expected_count = bin_cfg["expected_count"]
+            if routed_counts[bin_name] != expected_count:
+                raise RuntimeError("初始分类数量异常：{} 有 {} 个物块，预期为 {} 个；请检查识别".format(bin_name, routed_counts[bin_name], expected_count))
         if not self.live:
-            self.get_logger().info("DRY RUN 完成：没有连接或移动机械臂")
             return
         self.destroy_subscription(self._vision_subscription)
         self.robot = JointRobot(self.cfg, self.get_logger().info)
-        used_slots = {name: 0 for name in self.cfg["bins"]}
         home = self.cfg["inspection_home_angles"]
         self.robot.move(home, "startup_home")
         for station in self.cfg["stations"]:
             prefix = station["name"]
             class_name = classes[prefix]
             bin_name = self.cfg["class_routes"][class_name]
-            slot_index = used_slots[bin_name]
-            if slot_index >= len(self.cfg["bins"][bin_name]["slots"]):
-                raise RuntimeError("初始分类显示 {} 超过3个，{} 没有足够空位".format(class_name, bin_name))
-            slot = self.cfg["bins"][bin_name]["slots"][slot_index]
-            self.robot.gripper(close=False)
-            self.robot.move(station["approach_angles"], prefix + "_approach")
-            self.robot.move(station["pick_angles"], prefix + "_pick")
-            self.robot.gripper(close=True)
-            self.robot.move(station["retreat_angles"], prefix + "_retreat")
-            self.get_logger().info("{}: {} -> {} 的第{}槽".format(prefix, class_name, bin_name, slot_index + 1))
-            self.robot.move(home, prefix + "_transfer_home")
-            self.robot.move(slot["approach_angles"], bin_name + "_approach_{}".format(slot_index + 1))
-            self.robot.move(slot["place_angles"], bin_name + "_place_{}".format(slot_index + 1))
-            self.robot.gripper(close=False)
-            self.robot.move(slot["retreat_angles"], bin_name + "_retreat_{}".format(slot_index + 1))
-            self.robot.move(home, prefix + "_return_home")
-            used_slots[bin_name] += 1
-        self.robot.move(home, "finish_home")
-        self.get_logger().info("6 个物块分拣完成")
+            drop_point = self.cfg["bins"][bin_name]["drop_point"]
+            run_pick_place_cycle(self.robot, station, drop_point, home, prefix)
 
 
 def main(args=None):
@@ -121,8 +88,6 @@ def main(args=None):
         thread.start()
         node.execute()
     except KeyboardInterrupt:
-        if node:
-            node.get_logger().info("用户按 Ctrl+C，停止")
         if node and node.robot:
             node.robot.stop()
     except (ConfigError, RobotError, RuntimeError, ValueError) as exc:

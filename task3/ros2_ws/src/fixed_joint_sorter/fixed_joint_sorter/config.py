@@ -43,9 +43,8 @@ def validate_config(cfg, live=False):
             _angles(station.get(key), "stations[{}].{}".format(index, key), cfg, not live)
     _angles(cfg.get("inspection_home_angles"), "inspection_home_angles", cfg, not live)
     for bin_name, bin_cfg in cfg["bins"].items():
-        slots = bin_cfg.get("slots", [])
-        if len(slots) != 3:
-            raise ConfigError("{}.slots 必须正好有 3 个".format(bin_name))
-        for index, slot in enumerate(slots):
-            for key in ("approach_angles", "place_angles", "retreat_angles"):
-                _angles(slot.get(key), "{}.slots[{}].{}".format(bin_name, index, key), cfg, not live)
+        if bin_cfg.get("expected_count") != 3:
+            raise ConfigError("{}.expected_count 必须是 3".format(bin_name))
+        drop_point = bin_cfg.get("drop_point")
+        for key in ("approach_angles", "place_angles", "retreat_angles"):
+            _angles(drop_point.get(key), "{}.drop_point.{}".format(bin_name, key), cfg, not live)
