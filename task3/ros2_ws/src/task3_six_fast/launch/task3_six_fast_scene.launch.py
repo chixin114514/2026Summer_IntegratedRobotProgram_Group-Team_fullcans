@@ -6,7 +6,8 @@ stays valid and the existing ``sort_all`` client works unchanged.  Nothing that
 already existed is modified: the world and the shared URDF are read from the
 packages that own them.
 
-    ros2 launch task3_six_fast task3_six_fast_scene.launch.py headless:=false
+    ros2 launch task3_six_fast task3_six_fast_scene.launch.py \
+        headless:=false auto_sort:=true
 
 The motion configuration is built here from the reference one at launch time,
 with only the timing blocks replaced.  Deriving it instead of storing a second
@@ -132,6 +133,11 @@ def generate_launch_description():
                 default_value="false",
                 description="Run only the Ignition Gazebo server (no GUI).",
             ),
+            DeclareLaunchArgument(
+                "auto_sort",
+                default_value="false",
+                description="Use RGB colour recognition and automatically sort all six blocks.",
+            ),
             SetEnvironmentVariable("IGN_GAZEBO_RESOURCE_PATH", resource_path),
             ExecuteProcess(
                 cmd=["ign", "gazebo", "-r", str(world_file)],
@@ -195,6 +201,22 @@ def generate_launch_description():
                             "use_sim_time": True,
                         }],
                         remappings=SERVER_REMAPS,
+                        output="screen",
+                    ),
+                ],
+            ),
+            TimerAction(
+                period=7.0,
+                actions=[
+                    Node(
+                        package="task3_six_fast",
+                        executable="vision_sort",
+                        name="task3_six_vision_sort",
+                        condition=IfCondition(LaunchConfiguration("auto_sort")),
+                        parameters=[{
+                            "scene_config": str(scene_config),
+                            "use_sim_time": True,
+                        }],
                         output="screen",
                     ),
                 ],

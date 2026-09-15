@@ -33,8 +33,12 @@ _JACOBIAN_STEP_DEG = 0.5
 CONVERGED_M = 1e-4
 # 阻尼系数的相对量级（乘在 max(diag(J J^T)) 上）
 _REGULARIZATION_RELATIVE = 1e-8
-# 零空间姿态偏置增益（只作用在末端动不了的方向上）
-_POSTURE_GAIN = 0.05
+# 零空间姿态偏置增益。只作用在末端控制不了的那个自由度上，
+# 所以放大它不会影响末端精度，只会更快把关节拉回偏好构型。
+_POSTURE_GAIN = 0.30
+# 没传 posture 时用的默认偏好构型（J2, J3, J5），
+# 取自仿真里标定过的抓取分支中间位置。绝对不能用 seed_q 兜底。
+POSTURE_FALLBACK = (30.0, -17.0, 65.0)
 
 
 def _solve3(a, b):
@@ -82,18 +86,36 @@ def _jacobian(j1_deg, q, j4_deg, grip_rad, base_z, mid):
 
 
 def solve(target_xyz, seed_q, j1_deg, j4_deg=0.0, grip_rad=0.14, base_z=0.0,
-          iterations=400, max_step_deg=4.0, posture=None):
+          iterations=400, max_step_deg=4.0, posture=None, limits=None):
     """解出 (J2, J3, J5)，返回 ``((J2, J3, J5), 残差米)``。
 
     残差 > ``CONVERGED_M`` 说明这个点够不到或落在奇异构型附近；调用方只记录
     日志，不中止（按用户要求不做失败退出）。
 
-    ``seed_q`` 一定要传上一步的解，这样解会沿着同一条分支走，相邻目标之间
-    不会突变。``posture`` 是零空间里优先保持的姿态，默认就是 ``seed_q``。
+    ``seed_q`` 传上一步的解，让解沿着同一条分支走，相邻目标之间不突变。
+
+    ``posture`` 是零空间里要优先保持的姿态，**必须传一个固定的值**（比如配置
+    里那组种子构型）。如果传成上一步的解，``drift = posture - q`` 在第一次迭代
+    时恒为 0，偏置项等于没写，关节就会沿着那个没人管的自由度一路漂出去
+    （实测 J5 从 51° 漂到 243°）。所以这里的默认值是 ``POSTURE_FALLBACK``，
+    而不是 ``seed_q``。
+
+    ``limits`` 是 (J2, J3, J5) 的限位 ``(low, high)``，**在迭代内部就夹住**。
+    只在解完之后截断是没用的：截断会改变末端位置，解出来的位姿就对不上目标了。
     """
     tx, ty, tz = (float(value) for value in target_xyz)
-    q = [float(value) for value in (seed_q or (0.0, 0.0, 0.0))]
-    preferred = [float(value) for value in (posture or seed_q or (0.0, 0.0, 0.0))]
+
+    if limits:
+        low = [float(value) for value in limits[0]]
+        high = [float(value) for value in limits[1]]
+    else:
+        low, high = [-1e9, -1e9, -1e9], [1e9, 1e9, 1e9]
+
+    def feasible(values):
+        return [min(high[i], max(low[i], float(values[i]))) for i in range(3)]
+
+    q = feasible(seed_q or POSTURE_FALLBACK)
+    preferred = feasible(posture or POSTURE_FALLBACK)
     best_q = list(q)
     best_residual = float("inf")
     step_limit = math.radians(max(0.1, float(max_step_deg)))
@@ -142,6 +164,7 @@ def solve(target_xyz, seed_q, j1_deg, j4_deg=0.0, grip_rad=0.14, base_z=0.0,
         length = math.sqrt(sum(value * value for value in step))
         if length > step_limit:
             step = [value * step_limit / length for value in step]
-        q = [q[index] + math.degrees(step[index]) for index in range(3)]
+        # 迭代内部就夹到限位内，保证返回的解一定是可达的
+        q = feasible([q[index] + math.degrees(step[index]) for index in range(3)])
 
     return tuple(best_q), best_residual

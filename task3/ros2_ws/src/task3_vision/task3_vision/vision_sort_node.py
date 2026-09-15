@@ -107,6 +107,15 @@ class VisionSortNode(Node):
         upper = self.limits.get("upper") or [160.0, 120.0, 65.0, 155.0, 115.0, 180.0]
         self.lower = [float(v) for v in lower]
         self.upper = [float(v) for v in upper]
+        # IK 只解 (J2, J3, J5)，所以单独把这三个的限位传进去，让它在迭代内部就夹住
+        self.joint_limits_3 = (
+            [self.lower[1], self.lower[2], self.lower[4]],
+            [self.upper[1], self.upper[2], self.upper[4]],
+        )
+        # 零空间里优先保持的构型。必须是固定值：如果传成"上一步的解"，
+        # 第一次迭代 drift 就恒为 0，偏置等于没写，J5 会一路漂出限位。
+        posture = self.geometry.get("ik_posture_q")
+        self.posture = [float(v) for v in posture] if posture else None
 
         self.image_size = tuple(self.camera_conf.get("image_size", [640, 480]))
         self.max_age_s = float(self.camera_conf.get("max_age_s", 2.0))
@@ -187,15 +196,23 @@ class VisionSortNode(Node):
 
     # ------------------------------------------------------------------
     def _region_for(self, item):
-        """按类别名找落料区；名字对不上再按 class_id 兜底。"""
+        """按类别名找落料区；名字对不上再按 class_id 兜底。
+
+        兜底表的键一定要先规范化成字符串再查：YAML 里写 ``0:`` / ``1:`` 会被
+        解析成**整数**键，而 class_id 也可能以字符串形式过来。只按一种形式查
+        会让兜底静默失效（踩过一次：配置里明明写了 by_id，却完全没生效）。
+        """
         entry = self.classes.get(item["class_name"])
         if isinstance(entry, dict) and entry.get("region") in self.regions:
             return str(entry["region"])
-        by_id = self.classes.get("by_id") or {}
-        if str(item["class_id"]) in by_id:
-            fallback = str(by_id[str(item["class_id"])])
-            if fallback in self.regions:
-                return fallback
+
+        by_id = {
+            str(key): value
+            for key, value in (self.classes.get("by_id") or {}).items()
+        }
+        fallback = by_id.get(str(item["class_id"]))
+        if fallback is not None and str(fallback) in self.regions:
+            return str(fallback)
         return None
 
     def _inside_any_region(self, x, y):
@@ -358,11 +375,22 @@ class VisionSortNode(Node):
                 q, residual = ik.solve(
                     (step["x"], step["y"], step["z"]), seed, step["solve_j1"],
                     j4_deg=self.j4, grip_rad=self.grip_rad, base_z=self.base_z,
+                    posture=self.posture, limits=self.joint_limits_3,
                 )
+                # 用夹过限位的解当下一步的种子，否则解外的值会一路累加
                 seed = list(q)
                 arm_deg = self._clamp([
                     step["command_j1"], q[0], q[1], self.j4, q[2], step["command_j1"],
                 ])
+                # 关节顶在限位上说明这个点在这个构型下到不了，提示一下但继续走
+                for offset, index in enumerate((1, 2, 4)):
+                    if (abs(q[offset] - self.lower[index]) < 1e-6
+                            or abs(q[offset] - self.upper[index]) < 1e-6):
+                        self.get_logger().warn(
+                            f"{label} {step['stage']}: J{index + 1}={q[offset]:.2f} "
+                            f"顶在限位上（[{self.lower[index]:.0f}, "
+                            f"{self.upper[index]:.0f}]），这个点可能够不到，仍然继续"
+                        )
                 self._log(
                     "step", label=label, stage=step["stage"], index=index + 1,
                     target_xyz=[round(step["x"], 4), round(step["y"], 4),

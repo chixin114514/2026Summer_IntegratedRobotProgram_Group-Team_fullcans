@@ -1,11 +1,12 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>task3_six_fast</name>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
   <description>
     Faster variant of the six-object yellow/green sorting simulation.  Reuses the
     scene, world and robot description of task3_six_sim unchanged; only the step
-    accuracy budget and the arm compensation differ.
+    accuracy budget and the arm compensation differ. Includes RGB colour
+    recognition that generates the yellow/green sort plan from camera images.
   </description>
   <maintainer email="team@example.com">Integrated Robot Program Group Team</maintainer>
   <license>MIT</license>

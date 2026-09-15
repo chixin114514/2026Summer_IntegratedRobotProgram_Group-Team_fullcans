@@ -26,6 +26,8 @@ setup(
             "vision_sort = task3_vision.vision_sort_node:main",
             # 桌面标定节点（像素 -> 桌面 XY）
             "calibrate_table = task3_vision.calibrate_table:main",
+            # 不用 ROS 的自检：检查坐标点能不能解出来、会不会超限位
+            "check_workspace = task3_vision.check_workspace:main",
         ],
     },
 )
