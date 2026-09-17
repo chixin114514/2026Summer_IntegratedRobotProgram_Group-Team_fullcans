@@ -1,0 +1,29 @@
+{
+  "same_resolution_candidate_images": 16,
+  "corner_detection_success_images": 14,
+  "corner_detection_success_rate_percent": 87.5,
+  "final_used_images": 12,
+  "opencv_rms_px": 0.8936873515112369,
+  "mean_training_reprojection_error_px": 0.8765295030331345,
+  "leave_one_out_mean_reprojection_error_px": 0.9572055887534394,
+  "leave_one_out_max_reprojection_error_px": 1.3098982486624475,
+  "image_diagonal_px": 1600.0,
+  "training_error_percent_of_diagonal": 0.054783093939570905,
+  "leave_one_out_error_percent_of_diagonal": 0.059825349297089964,
+  "custom_fit_score_percent": 99.94521690606042,
+  "custom_cross_validation_score_percent": 99.9401746507029,
+  "holdout_errors_px": {
+    "微信图片_20260917113616_9_47.jpg": 1.3098982486624475,
+    "微信图片_20260917113619_12_47.jpg": 0.7085598013950118,
+    "微信图片_20260917113620_13_47.jpg": 0.5893085751004731,
+    "微信图片_20260917113621_14_47.jpg": 0.6406346584873479,
+    "微信图片_20260917113622_15_47.jpg": 0.7845620338786266,
+    "微信图片_20260917113623_16_47.jpg": 0.8986260569740743,
+    "微信图片_20260917113624_17_47.jpg": 1.1052807377398726,
+    "微信图片_20260917113625_18_47.jpg": 1.0468387507854544,
+    "微信图片_20260917113627_19_47.jpg": 0.9658151550903791,
+    "微信图片_20260917113724_32_47.jpg": 1.2465527330235187,
+    "微信图片_20260917113727_34_47.jpg": 1.0193792178351446,
+    "微信图片_20260917113729_37_47.jpg": 1.1710110960689235
+  }
+}

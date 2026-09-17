@@ -1,0 +1,25 @@
+{
+  "left_image": "/Users/a1523647308/overleaf modify/stereo_depth_opencv/data/aloeL.jpg",
+  "right_image": "/Users/a1523647308/overleaf modify/stereo_depth_opencv/data/aloeR.jpg",
+  "input_size": [
+    641,
+    555
+  ],
+  "scale": 0.5,
+  "algorithm": "OpenCV StereoSGBM (SGBM_3WAY)",
+  "python_version": "3.8.3",
+  "opencv_version": "4.12.0",
+  "numpy_version": "1.24.4",
+  "min_disparity": 0,
+  "num_disparities": 128,
+  "block_size": 5,
+  "focal_length_px": 512.8000000000001,
+  "baseline_m": 0.1,
+  "valid_pixel_ratio": 0.7078804233250411,
+  "disparity_min_valid_px": 0.6875,
+  "disparity_max_valid_px": 127.0,
+  "depth_min_m": 0.4037795066833496,
+  "depth_max_m": 74.5890884399414,
+  "point_count": 249334,
+  "scale_warning": "The aloe pair has no physical calibration; replace baseline and focal length for metric depth."
+}
